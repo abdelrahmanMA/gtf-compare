@@ -50,7 +50,7 @@ In order to be able to answer each of the above questons, further analysis are r
 
 **Note 2**: The algorithm of exon matching: For each new assembled exon, find all overlapping reference exons. If it overlaps with many reference exons, assign this exon to the reference exon with longest overlap (as an absolute no of shared base pairs). If it shares the same length of sequence with multiple reference exons, choose the shortest reference exon. Now you can construct this table:
 
-![Exons table format](https://picasaweb.google.com/102858949479140257320/6557993000802606273#6557993004294974978)
+![Exons table format](https://drive.google.com/file/d/12aIp24i-75AjYWq5cBsF8r7bMw87Z6aa/view?usp=sharing)
 
 * Note: The same reference exon can be assigned to many Asm. exons (many of them will have partial matches)
 
