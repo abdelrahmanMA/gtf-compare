@@ -1,4 +1,7 @@
 # gtf-compare
+
+
+
  -   **Introduction**:
 
 A crucial step after any task, is to evaluate the output of this task and gain insight on how efficient and accurate the process went. The task in hand is to assess the GTF output of an RNA-seq assembler by comparing it to a reference annotation and analyzing how exons, isoforms and genes are matched.
@@ -50,7 +53,7 @@ In order to be able to answer each of the above questons, further analysis are r
 
 **Note 2**: The algorithm of exon matching: For each new assembled exon, find all overlapping reference exons. If it overlaps with many reference exons, assign this exon to the reference exon with longest overlap (as an absolute no of shared base pairs). If it shares the same length of sequence with multiple reference exons, choose the shortest reference exon. Now you can construct this table:
 
-![Exons table format](https://drive.google.com/file/d/12aIp24i-75AjYWq5cBsF8r7bMw87Z6aa/view?usp=sharing)
+![Exons table format](https://lh3.googleusercontent.com/7hEwx5o2xxkVeZygmNCwEeQ1rBLsdmMIqiCk4weF1eyC1_E6E2bZd09QykCtiIbIDx8XKhJKZEI "Exons table format")
 
 * Note: The same reference exon can be assigned to many Asm. exons (many of them will have partial matches)
 
@@ -74,7 +77,7 @@ In order to be able to answer each of the above questons, further analysis are r
 
 **Note:** The algorithm of junction assessment: For each row in the exon output table, define the possible junctions, type of the reference junctions and do the match. This algorithm should not need to check the annotation files anymore because all calculations will depend on the exon output table
 
-![Bounaries table format](https://picasaweb.google.com/102858949479140257320/6557993706686754177#6557993704104333202)
+![Boundaries Table format](https://lh3.googleusercontent.com/T0e-DU3DHkFr16Kpg-X7lH35Bu2saKpfob9N-RJM5g_6m6nYZGeA_AvjYHFu_SpSWPgbOK0xotU)
 
 **How to judge isoforms?**
 
@@ -98,7 +101,7 @@ In order to be able to answer each of the above questons, further analysis are r
 
 **Note 1**: The algorism of isoform matching: For each new assembled isoform, find all overlapping reference isoforms (overlapping means share exonic sequence). If it overlaps with many reference isoforms, assign this isoform to the reference isoform with longest overlap (as an absolute no of shared base pairs). If it shares the same length of sequence with multiple reference isoforms, choose the shortest reference isoform
 
-![isoforms table format](https://picasaweb.google.com/102858949479140257320/6557996176405634257#6557996178397890642)
+![Isoforms table format](https://lh3.googleusercontent.com/QGjqw5-D3S5MmgcJ-hvNzjB68KTFGTtH-yL7TbRm9mi8PDW-r7JGBCcI6RaMrCYjTbkC_XYMlBs)
 
 * Note: The same reference isoform can be assigned to many Asm. isoforms (many of them will have partial matches)
 
@@ -123,7 +126,7 @@ We can use the exon and transcript output tables to generate statistics about th
 
 - **Flowchart**:
 
-![Flowchart for the code](https://picasaweb.google.com/102858949479140257320/6558007658427209313#6558007661613919250)
+![Code flowchart](https://lh3.googleusercontent.com/r3wWtuleybBQNpEiDXkVa2ECZZH24p6gm2RYUdywlx52kVf1pw25SpOfZJv-_BuUb_A7KkdsiKo)
 _______________________________
 
 1.  cole-trapnell-lab.github.io/cufflinks/cuffcompare/
