@@ -79,11 +79,13 @@ class Exon(Feature):
 
     @staticmethod
     def match_exons(exon1, exon2):
-        if exon1.start > exon2.start:
+        if exon1.start > exon2.start or (exon1.start == exon2.start and exon2.size > exon1.size):
             temp_ = exon1
             exon1 = exon2
             exon2 = temp_
-        return exon1.end - exon2.start
+        if exon2.end > exon2.end:
+            return exon1.end - exon2.start
+        return exon2.size
 
 
 class Parents:
@@ -143,9 +145,9 @@ def find_best_match(asm_features, ref_features):
 
         if matched_ref_feature is not None:
             if matched_ref_feature.id not in best_matches.keys():
-                best_matches[matched_ref_feature.id] = [(asm_feature.id, basepair)]
+                best_matches[matched_ref_feature.id] = [(asm_feature.id, max_basepair)]
             else:
-                best_matches[matched_ref_feature.id].append((asm_feature.id, basepair))
+                best_matches[matched_ref_feature.id].append((asm_feature.id, max_basepair))
     return [best_matches, ref_matches, asm_matches]
 
 
@@ -202,7 +204,7 @@ def argument_parser():
        the accuracy of mRNAs or gene models given in <input.gtf>''', metavar='<input.gtf>', nargs='*')
 
     parser.add_argument('-th', help='a basepair threshold for exon matching',
-                        metavar='basepair threshold', type=int, nargs=1, default=[300])
+                        metavar='basepair threshold', type=int, nargs=1, default=[0])
 
     parser.add_argument('-it', help='useful to speed up database generation if your GTF file has transcript features',
                         action="store_true", default=False)
@@ -252,6 +254,7 @@ asmdb, asm_exons, asm_parents = [], [], []
 best_match, refmatches, asmmatches = [], [], []
 file_table, file_junction = [], []
 
+
 for x in input_files:
     asmdb.append(gffutils.FeatureDB(x))
     asm_exons.append(list(asmdb[-1].features_of_type('exon', order_by='start')))
@@ -275,8 +278,8 @@ for gene in ref_genes:
     for exon in refexons:
         for ii in range(len(input_files)):
             file_table[ii].write("-ref {} \t {} \t {} \t {} \t {} \t {} \t {}"
-                             .format(ref_parents.gene(exon).id, exon.transcript.id, exon.id, exon.start,
-                                     exon.end, exon.size, exon.type_))
+                                 .format(ref_parents.gene(exon).id, exon.transcript.id, exon.id, exon.start,
+                                         exon.end, exon.size, exon.type_))
             if exon.id in refmatches[ii].keys():
                 if exon.id in best_match[ii].keys():
                     for match, bp in best_match[ii][exon.id]:
