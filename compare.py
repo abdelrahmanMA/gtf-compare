@@ -327,6 +327,9 @@ for x in range(len(input_files)):
                                  .format(asm_parents[ii].gene(exon).id, exon.transcript.id, exon.id,
                                          exon.start, exon.end, exon.size, "Novel II"))
                 file_junction[ii].write(write_junctions(asm=exon))
+                
 for x in range(len(input_files)):
     file_table[ii].close()
     file_junction[ii].close()
+    
+
