@@ -330,3 +330,6 @@ for x in range(len(input_files)):
 for x in range(len(input_files)):
     file_table[ii].close()
     file_junction[ii].close()
+
+
+    
