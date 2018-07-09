@@ -1,9 +1,5 @@
-# gtf-compare
-
-
-
- -   **Introduction**:
-
+ **Introduction**:
+==================
 A crucial step after any task, is to evaluate the output of this task and gain insight on how efficient and accurate the process went. The task in hand is to assess the GTF output of an RNA-seq assembler by comparing it to a reference annotation and analyzing how exons, isoforms and genes are matched.
 
 The current -and only- program that performs this task is cuffcompare from cufflinks. Cuffcompare is concerned about calculating the sensitivity and specificity on various levels including nucleotides, exons, introns, intronic chains, transcripts and locus. It can perform the analysis over several outputted GTFs from different experiments and capture the shared transcripts between them, with or without a reference annotation.
@@ -13,18 +9,17 @@ In case of provided reference annotation, cuffcompare outputs two files, .refmap
 Another two informative file are outputted from cuffcompare which is .combined and .tracking. In .combined file, all transcripts appeared at least one time in one of the GTFs files is reported, and reported isoforms get reported only once. The .tracking file matches the transcripts between samples by satisfying specific condition such as coordinates and order of all exons, with a slack for the first and last exon.
 
 In terms of transcript analysis, the program performs in a very informative way and provides detailed information on transcripts overlaps and overlap types. However, when it comes to further analysis or breaking down these overlaps to recognize which regions were misplaced, what boundaries where dislocated, or the overall performance of splice junctions locating, cuffcompare fails to provide this type of data. The need for further analysis performed on the exonic, junctions and gene levels to be able to give a more descriptive judge on the assemblers output and to study further reasons that could arise by examining these levels, led us to propose another program to analyze GTFs in more descriptive ways.
-
- - **Proposal** 
  
- **Task**: 
+ **Aims (for now)**:
+====================
 1.  Extend the Cuffcompare functionality from comparing isoforms (Transfrags) to compare exons, exon-exon junctions, and genes
 2.  Provide better matrices to compare the differences between annotations (This should produce better summary stats than current Cuffcompare)
 3.  Gene specific or interval specific reports 
 
 **Before we start:** 
--------------------- 
+====================
 **Level of restriction**
-
+------------------------
 Dealing with stand issue in GTF is always tricky. I can think of 3 scenarios: 
 1.  Strict: 3 lists for positive, negative and unknown strands
 2.  Intermediate: 2 lists for all possible positive and negative strands. Add the intervals of unknown strand to both lists
@@ -32,11 +27,12 @@ Dealing with stand issue in GTF is always tricky. I can think of 3 scenarios:
 I think we should implement the “Intermediate” level for now. However we have to consider the effect of the stand on the gene annotation. Remeber that the 5' and 3' ends of an isofomrs on the +ve strand are ooposite to those on the -ve strand  
 
 **GTF as a tree structure:**
-
+----------------------------
 Each gene has a unique id and is associated with a no of isoforms. Each isoform in a gene has a unique id and is associated with a no of exons.  Each exon in an isoform has a unique id. However we typically have multiple identical exons in the different isoforms so we end up with having this same exonic stretch with multiple ids. Also theoretically we might have the same isoforms with multiple ids because it belongs to multiple genes (This is not normal but can happen in crazy assembly or merge).
 Can we have exons or transcripts without genes? I saw some cases like this. How does the parser behave? Should we ignore for now?    
 
 **Types of exons**
+------------------
 1.  The first exon in the isoform 
 	1.  With the longest 5’ end in a gene
 2.  The last exon in the isoform 
@@ -46,6 +42,7 @@ Can we have exons or transcripts without genes? I saw some cases like this. How 
 5.  Middle exon in some isoforms but the last exon in other isoforms
 
 **Types of exonic boundaries?**
+--------------------------------
 1.  The start of the first exon in the isoform (it is not a splice junction) 
 	1.  With the longest 5’ end in a gene  ==> this will be the start of the gene  
 2.  The end of the last exon in the isoform (it is not a splice junction) 
@@ -54,7 +51,9 @@ Can we have exons or transcripts without genes? I saw some cases like this. How 
 4.  Exon-intron junction in some isoforms but the start of the first exon in other isoforms   
 5.  Exon-intron junction in some isoforms but the end of the last exon in other isoforms
 
- **Compenets of the problem**: To judge the efficiency of an assembler, four levels of analysis are needed:
+ **Components of the problem**: 
+ ------------------------------
+ To judge the efficiency of an assembler, We have to adress these questions:
 1.  Are the genes found?
 2.  Are the isoforms found? How accurate their starnd, intronic chains, and boundaries?
 3.  Are the exons found? How accurate their boundaries?
@@ -62,13 +61,13 @@ Can we have exons or transcripts without genes? I saw some cases like this. How 
 In order to be able to answer each of the above questons, further analysis are required for each level where we can summarize them as follows:
 
 **How to judge gene/locus?**
-
+----------------------------
 We have two level:
 1. Locus overlap 
 2. Stats of matching for its transcripts and exons  
 
 **How to judge isoforms?**
-
+--------------------------
 1.  Precise intronic chain and precise isoform boundaries.
 2.  Precise intronic chain but wrong isoform boundaries.
 3.  Query is contained (The query is missing junctions on either or both ends but the remaining > 0 & precise)
@@ -84,6 +83,7 @@ We have two level:
 - no of shared exonic bases/ no of intronic bases/ no of 5' novel bases/ no of 3' novel bases
  
 **How to judge exons?**
+-----------------------
 1.  Overlap with one exon with precise boundaries (perfect match)
 2.  Overlap with one exon with imprecise boundaries (partial match: containment or overlapping): count base diff
 3.  More than one-to-one relationship: count base diff
@@ -94,6 +94,7 @@ We have two level:
 **Note** It could be useful to judge the parent isoforms: What is the best relationship between their possible parents isoforms?
 
 **How to judge exonic boundaries?**
+-----------------------------------
 Each junction is defined by the last base position of the 5' exon & the first base position of the 3' exon
 1.  Percise known match: The junction exactly match a reference one
 2.  Percise unknown match: the junction match a start and end of known exons but the junction itself is not in the ref
@@ -102,6 +103,7 @@ Each junction is defined by the last base position of the 5' exon & the first ba
 
 
 **Algorithm** 
+=============
 1.  Parse genes in the GTFs (or the DBs) into a list sorted by co-ordinates (note that gene id is unique but gene name does not need to)
 2.  Link each locus with a list of its isoforms (an array of arrays for the isoform ids)
 3.  Convert genes into a list of intervals per chromosome. * See the note about the list design. If the gene is not defined in the GTF and we can not query the DB for its boundaries, define the gene interval that starts by the beginning of the most 5’ isoform and ends by the end of the most 3’ isoform
