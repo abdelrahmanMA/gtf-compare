@@ -78,7 +78,8 @@ We have two level:
 5.  No exonic overlap but overlap with reference on the opposite strand
 6.  No exonic overlap but locus overlap ==> intronic containment, novel 5' expression, or novel 3' expression	
 7.  No exonic sequence overlap & no locus overlap    
- **Note**: This type require extra-output table that has:
+
+**Note about Exonic overlap with imprecise intronic chain**: This type require extra-output table that has:
 - no of junc in query/ no of matching junc/ no of junc in ref
 - no of shared exonic bases/ no of intronic bases/ no of 5' novel bases/ no of 3' novel bases
  
@@ -106,15 +107,25 @@ Each junction is defined by the last base position of the 5' exon & the first ba
 =============
 1.  Parse genes in the GTFs (or the DBs) into a list sorted by co-ordinates (note that gene id is unique but gene name does not need to)
 2.  Link each locus with a list of its isoforms (an array of arrays for the isoform ids)
-3.  Convert genes into a list of intervals per chromosome. * See the note about the list design. If the gene is not defined in the GTF and we can not query the DB for its boundaries, define the gene interval that starts by the beginning of the most 5’ isoform and ends by the end of the most 3’ isoform
+3.  Convert genes into a list of intervals per chromosome. (* See the note about the suugested design for inetrvals data strusture). If the gene is not defined in the GTF and we can not query the DB for its boundaries, define the gene interval that starts by the beginning of the most 5’ isoform and ends by the end of the most 3’ isoform
 	* Is it better to have separate lists per strand? If yes the gene should take the strand sign of its isoform with the highest no of splice junctions and defined strand.
 4.  Find overlapping intervals:
 	1.  For a one-way analysis: Find all reference intervals overlapping with each query interval
 	2.  For a two-way analysis: Find the opposite as well. Do we need to consider a super locus that include all overlapping loci?
+	*  **Note:** Example results :
+	1.  One way search, results can be 
+		1.  0:1(novel) 
+		2.  1:1 (found unique)
+		3.  M:1 (chimeric)
+	2.  Two way search, results can be:
+		1.  1:0 (missed) OR 0:1(novel) 
+		2.  1:1 (found unique)
+		3.  1:M (fragmented) OR M:1 (chimeric)
+		4.  M:M (found complex) 
 5.  Match exons:
 	1.  Make a map between all exon ids in the tested interval and their co-ordinates. 
 	2.  Create a unique list of exonic co-ordinates (now this is the actual list of unique exons in the gene)
-	3.  Match the exons sequenctially 
+	3.  Match the exons sequenctially: find all overlapping reference exons. If it overlaps with many reference exons, assign this exon to the reference exon with longest overlap (as an absolute no of shared base pairs). If it shares the same length of sequence with multiple reference exons, choose the shortest reference exon.
 6.  Parse isoforms in the GTFs (or the DBs) into 2 lists (for the 2 strands) sorted by co-ordinates
 7.  Link each isoform with a list of its exon intervals (These are the unique inetrvals)
 8.  Match Junctions
@@ -129,33 +140,28 @@ Each junction is defined by the last base position of the 5' exon & the first ba
 	2.  Calc the bed intersection of each two
 10.  Locus stats
 
-List design: I can think of 2 designs to enable efficient search:
-•  Random access design: Each list can be presented as 2 arrays S and E (all structures are sorted): One for the starts and one for the ends. Now you can check for any point (x) if it falls in any interval by finding the first item (i) in E array where Ei >= x then confirm that x <= Si
+
+**Notes:** 
+---------
+
+**Design for inetrvals data strusture:** 
+-  Random access design: Each list can be presented as 2 arrays S and E (all structures are sorted): One for the starts and one for the ends. Now you can check for any point (x) if it falls in any interval by finding the first item (i) in E array where Ei >= x then confirm that x <= Si
 I think this will be best fit for one-way search with the query items much smaller than the reference
-•  Sequential access design 
 
 
-Notes:
-- Edge case: If the gene is not defined in the GTF, all the overlapping isoforms on the same strand will be considered one locus (un-stranded isoforms will be included with both strands). Overlapping means sharing exonic sequence. 
+**Edge case:**
+-  If there is no gene id in the GTF , all the overlapping isoforms on the same strand will be considered one locus (un-stranded isoforms will be included with both strands). Overlapping means sharing exonic sequence. 
 
+**The two-way search problem:**
+The best match for isoform in the reference, is not the same best match for the isoform in the assembly. 
+Suugested solution: the “found isoforms” can be additionally labeled by its rank match aganist the reference 
 
-**Note:**: 
-
--  The algorithm of exon matching: For each new assembled exon, find all overlapping reference exons. If it overlaps with many reference exons, assign this exon to the reference exon with longest overlap (as an absolute no of shared base pairs). If it shares the same length of sequence with multiple reference exons, choose the shortest reference exon. Now you can construct this table:
+**Random notes:**
 -  The same reference isoform or exon can be assigned to many Asm. exons (many of them will have partial matches)
--  The algorithm of junction assessment: For each row in the exon output table, define the possible junctions, type of the reference junctions and do the match. This algorithm should not need to check the annotation files anymore because all calculations will depend on the exon output table
--  In the two-way mode, the “found isoforms” can be additionally labeled by its rank match aganist the reference 
-  
-
-**Problems**:
-1.  One of the problem that could face us while implementing the code is the fact of shared isoforms between different genes. If the some exon in isoform in gene x was shared with another isoform in gene y, an in the assembler, we found the isoform of gene x. Will we report that gene y isoform exists as well?  
-   **Solution**: The solution to this problem will be converting the problem from many-to-many relationship to one-to-one relationship. Instead of reporting all the isoforms overlapped between both reference and sequence, only isoform with the maximum overlapping is reported.    
-2.  The second problem is the case where the best match for isoform in the reference, is not the same best match for the isoform in the assembly.  
-    **Solution**: A primary solution will be to start the comparison from one file and take the best match from this file’s side.
-    
-
-**Implementation**: To implement this code, we will need to convert the information in the GTF file to bunch of features for each judgment (exons, isoforms, and genes), and for each file as well (reference and assembly). By tracing the features from the reference in the assembly, we will get a hint on the sensitivity of the assembler, while tracing the features of the assembly will give us a hint on the assembler’s specificity.
+-  By tracking the features from the reference in the assembly, we will get a hint on the sensitivity of the assembler, while tracing the features of the assembly will give us a hint on the assembler’s specificity.      
 
 
+**References**
+===============
 
 1.  cole-trapnell-lab.github.io/cufflinks/cuffcompare/
