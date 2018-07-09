@@ -26,9 +26,9 @@ In terms of transcript analysis, the program performs in a very informative way 
 **Level of restriction**
 
 Dealing with stand issue in GTF is always tricky. I can think of 3 scenarios: 
-a)	Strict: 3 lists for positive, negative and unknown strands
-b)	Intermediate: 2 lists for all possible positive and negative strands. Add the intervals of unknown strand to both lists
-c)	Lenient: 1 list for all intervals 
+1.  Strict: 3 lists for positive, negative and unknown strands
+2.  Intermediate: 2 lists for all possible positive and negative strands. Add the intervals of unknown strand to both lists
+3.  Lenient: 1 list for all intervals 
 I think we should implement the “Intermediate” level for now. However we have to consider the effect of the stand on the gene annotation. Remeber that the 5' and 3' ends of an isofomrs on the +ve strand are ooposite to those on the -ve strand  
 
 **GTF as a tree structure:**
@@ -65,78 +65,72 @@ In order to be able to answer each of the above questons, further analysis are r
 
 We have two level:
 1. Locus overlap 
-2. Matching stats for its transcripts and exons  
+2. Stats of matching for its transcripts and exons  
 
 **How to judge isoforms?**
 
-1. The ref isoform was found with: 
- 	1.  Precise intronic chain and precise isoform boundaries.
-	2.  Precise intronic chain but wrong isoform boundaries.
-	3.  Query is contained (The query is missing junctions on either or both ends but the remaining > 0 & precise)
- 	**Note**: In the two-way mode, the “found isoforms” can be additionally labeled by its rank match aganist the reference 
-
-2.  Novel isoform. This might happen in any of these cases:
-	1.  No exonic sequence overlap & no locus overlap    
-	2.  No exonic overlap but locus overlap ==> intronic containment, novel 5' expression, or novel 3' expression
-	3.  Reference is contained (The query has more junctions on either or both ends but the remaining > 0 & precise)
-	4.  Exonic overlap with imprecise intronic chain (but not any form of containment). ==> See the note  
-	5.  Overlap with reference on the opposite strand
- 	**Note**: This type require extra-output table that has:
-	- no of junc in query/ no of matching junc/ no of junc in ref
-	- no of shared exonic bases/ no of intronic bases/ no of 5' novel bases/ no of 3' novel bases
+1.  Precise intronic chain and precise isoform boundaries.
+2.  Precise intronic chain but wrong isoform boundaries.
+3.  Query is contained (The query is missing junctions on either or both ends but the remaining > 0 & precise)
+4.  Exonic overlap with imprecise intronic chain (but not Query containment). ==> See the note  
+	- we can make subcategories here: e.g. 
+	1.  Reference is contained (The query has more junctions on either or both ends but the remaining > 0 & precise)
+	2.  check Cuffcompre for other options
+5.  No exonic overlap but overlap with reference on the opposite strand
+6.  No exonic overlap but locus overlap ==> intronic containment, novel 5' expression, or novel 3' expression	
+7.  No exonic sequence overlap & no locus overlap    
+ **Note**: This type require extra-output table that has:
+- no of junc in query/ no of matching junc/ no of junc in ref
+- no of shared exonic bases/ no of intronic bases/ no of 5' novel bases/ no of 3' novel bases
  
 **How to judge exons?**
-1.  Ref Not found. This might happen in any of these cases:
-	1.  No overlap between the ref exon and the new asm.
-	2.  Minimal exonic overlap (but not “enough”)
-	3.  Enough overlap but not the best match (i.e. there is another exon that better match the reference)
-2.  The ref exon was found with:
-	1.  Judge the boundaries
-		1.  Imprecise boundaries (partial match)
-		2.  Precise boundaries (perfect match)
-	2. Judge the parent isoform
-		1. Parents isoforms are not the best match
-		2. Parents isoforms are the best match 
-3.  Novel Asm. exon. This might happen if:
-	1.  No overlap with any ref exon 
-	2.  Minimal exonic overlap (but not “enough”)
-	
+1.  Overlap with one exon with precise boundaries (perfect match)
+2.  Overlap with one exon with imprecise boundaries (partial match: containment or overlapping): count base diff
+3.  More than one-to-one relationship: count base diff
+	1.  Reference exon overlaps with multiple query exons 
+	2.  Query exon overlaps with multiple reference exons
+	3.  Many reference exons overlap with many query exons
+4.  No overlap between the ref exon and the new asm
+**Note** It could be useful to judge the parent isoforms: What is the best relationship between their possible parents isoforms?
 
 **How to judge exonic boundaries?**
-1.  Not found: if the whole reference exon was not found  
-2.  Ref junction Found
-	1.  Imprecise: if the ref exon is found (imprecise) but the junction is imprecise    
-	2.  Precise: if the ref exon is found (precise or imprecise) and the junction is precise.    
-3.  Novel junction: if the asm exon is novel  
+Each junction is defined by the last base position of the 5' exon & the first base position of the 3' exon
+1.  Percise known match: The junction exactly match a reference one
+2.  Percise unknown match: the junction match a start and end of known exons but the junction itself is not in the ref
+3.  Imprecise: The junction is half known
+4.  Novel: both ends are novel 
 
 
 **Algorithm** 
 1.  Parse genes in the GTFs (or the DBs) into a list sorted by co-ordinates (note that gene id is unique but gene name does not need to)
-2.  Link each locus with a list of its isoforms (additional array of arrays for the isoform ids)
+2.  Link each locus with a list of its isoforms (an array of arrays for the isoform ids)
 3.  Convert genes into a list of intervals per chromosome. * See the note about the list design. If the gene is not defined in the GTF and we can not query the DB for its boundaries, define the gene interval that starts by the beginning of the most 5’ isoform and ends by the end of the most 3’ isoform
 	* Is it better to have separate lists per strand? If yes the gene should take the strand sign of its isoform with the highest no of splice junctions and defined strand.
 4.  Find overlapping intervals:
 	1.  For a one-way analysis: Find all reference intervals overlapping with each query interval
-	2.  For a two-way analysis: Find the opposite as well
-5.  Match isoforms 
-	1.  Calculate the exonic overlap between all isoforms: suggestion
-		1.  Convert each isoform into bed 
-		2.  Calc the bed intersection of each two
-	2.  If it overlaps with many reference isoforms, assign this isoform to the reference isoform with longest overlap (as an absolute no of shared base pairs). If it shares the same length of sequence with multiple reference isoforms, choose the shortest reference isoform
-	3.  Check all isoform overlap options in Cuffcompare
-
-6.  Match exons:
-	1.  Make a map between all exon ids in the tested interval and their co-ordinates.
-	2.  Create a unique list of exonic co-ordinates 
-7.  Parse isoforms in the GTFs (or the DBs): Convert isoforms into list(s) of intervals per chromosome (according to the level of restriction; currently we do the intermediate level only so we have 2 lists). * See the note about the list design
-8.  Link each locus with a list of its isoforms and lists of their exons
-9.  Parsing exons in the GTFs (or the DBs): Convert isoforms into list(s) of intervals per chromosome (according to the level of restriction; currently we do the intermediate level only so we have 2 lists). * See the note about the list design
-
+	2.  For a two-way analysis: Find the opposite as well. Do we need to consider a super locus that include all overlapping loci?
+5.  Match exons:
+	1.  Make a map between all exon ids in the tested interval and their co-ordinates. 
+	2.  Create a unique list of exonic co-ordinates (now this is the actual list of unique exons in the gene)
+	3.  Match the exons sequenctially 
+6.  Parse isoforms in the GTFs (or the DBs) into 2 lists (for the 2 strands) sorted by co-ordinates
+7.  Link each isoform with a list of its exon intervals (These are the unique inetrvals)
+8.  Match Junctions
+	1.  Make a list of all junctions in all isoform
+	2.  merge duplicates 
+	3.  Match query versus reference 
+9. Match isoforms:  
+	1. Compare each query and reference isoforms using junction lists
+	2. Compare each query and reference isoforms using unique exon inetrval lists
+	* Another suggestion
+	1.  Convert each isoform into bed 
+	2.  Calc the bed intersection of each two
+10.  Locus stats
 
 List design: I can think of 2 designs to enable efficient search:
-•	Random access design: Each list can be presented as 2 arrays S and E (all structures are sorted): One for the starts and one for the ends. Now you can check for any point (x) if it falls in any interval by finding the first item (i) in E array where Ei >= x then confirm that x <= Si
+•  Random access design: Each list can be presented as 2 arrays S and E (all structures are sorted): One for the starts and one for the ends. Now you can check for any point (x) if it falls in any interval by finding the first item (i) in E array where Ei >= x then confirm that x <= Si
 I think this will be best fit for one-way search with the query items much smaller than the reference
-•	Sequential access design 
+•  Sequential access design 
 
 
 Notes:
@@ -148,6 +142,7 @@ Notes:
 -  The algorithm of exon matching: For each new assembled exon, find all overlapping reference exons. If it overlaps with many reference exons, assign this exon to the reference exon with longest overlap (as an absolute no of shared base pairs). If it shares the same length of sequence with multiple reference exons, choose the shortest reference exon. Now you can construct this table:
 -  The same reference isoform or exon can be assigned to many Asm. exons (many of them will have partial matches)
 -  The algorithm of junction assessment: For each row in the exon output table, define the possible junctions, type of the reference junctions and do the match. This algorithm should not need to check the annotation files anymore because all calculations will depend on the exon output table
+-  In the two-way mode, the “found isoforms” can be additionally labeled by its rank match aganist the reference 
   
 
 **Problems**:
