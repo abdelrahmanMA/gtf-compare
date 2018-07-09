@@ -29,7 +29,7 @@ Dealing with stand issue in GTF is always tricky. I can think of 3 scenarios:
 a)	Strict: 3 lists for positive, negative and unknown strands
 b)	Intermediate: 2 lists for all possible positive and negative strands. Add the intervals of unknown strand to both lists
 c)	Lenient: 1 list for all intervals 
-I think we should implement the “Intermediate” level for now  
+I think we should implement the “Intermediate” level for now. However we have to consider the effect of the stand on the gene annotation. Remeber that the 5' and 3' ends of an isofomrs on the +ve strand are ooposite to those on the -ve strand  
 
 **GTF as a tree structure:**
 
@@ -45,21 +45,19 @@ Can we have exons or transcripts without genes? I saw some cases like this. How 
 4.  Middle exon in some isoforms but the first exon in other isoforms    
 5.  Middle exon in some isoforms but the last exon in other isoforms
 
-**What are the types of exonic boundaries?**
-1.  The start of the first exon in the isoform 
-	1.  With the longest 5’ end in a gene    
-2.  The end of the last exon in the isoform 
-	1.  With the longest 3’ end in a gene    
+**Types of exonic boundaries?**
+1.  The start of the first exon in the isoform (it is not a splice junction) 
+	1.  With the longest 5’ end in a gene  ==> this will be the start of the gene  
+2.  The end of the last exon in the isoform (it is not a splice junction) 
+	1.  With the longest 3’ end in a gene ==> this will be the end of the gene     
 3.  Exon-intron junction in all isoforms   
 4.  Exon-intron junction in some isoforms but the start of the first exon in other isoforms   
 5.  Exon-intron junction in some isoforms but the end of the last exon in other isoforms
 
- **Compenets of the problem**: In order to be able to judge the efficiency of an assembler, four levels of analysis are needed:
-1.  Are the exons found?
-2.  How accurate their boundaries?
-3.  Are the isoforms found?
-4.  Are the genes found?
-    
+ **Compenets of the problem**: To judge the efficiency of an assembler, four levels of analysis are needed:
+1.  Are the genes found?
+2.  Are the isoforms found? How accurate their starnd, intronic chains, and boundaries?
+3.  Are the exons found? How accurate their boundaries?
 
 In order to be able to answer each of the above questons, further analysis are required for each level where we can summarize them as follows:
 
