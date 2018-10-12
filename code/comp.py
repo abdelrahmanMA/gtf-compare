@@ -8,6 +8,7 @@ import operator
 
 input_files = None
 
+
 class Exon(gffutils.Feature):
 
     def __init__(self, feature):
@@ -25,19 +26,21 @@ class Exon(gffutils.Feature):
 
 class GtfInterval:
 
-    def __init__(self, exon_id, transcript_id, gene_id):
+    def __init__(self, exon_id, transcript_id, gene_id, number):
 
         self.exonIds = set([exon_id])
         self.transcriptIds = set([transcript_id])
         self.geneIds = set([gene_id])
+        self.tran_number = str(transcript_id) + "[" + str(number) + "]"
 
-    def add(self, exon_id, transcript_id, gene_id):
+    def add(self, exon_id, transcript_id, gene_id, number):
 
         if exon_id not in self.exonIds:
             self.exonIds.add(exon_id)
 
         if transcript_id not in self.transcriptIds:
             self.transcriptIds.add(transcript_id)
+            self.tran_number += "|" + str(transcript_id) + "[" + str(number) + "]"
 
         if gene_id not in self.geneIds:
             self.geneIds.add(gene_id)
@@ -45,7 +48,7 @@ class GtfInterval:
 
 class GtfExon:
 
-    def __init__(self, interval, transcript_id, gene_id):
+    def __init__(self, interval, transcript_id, gene_id, number):
 
         self.interval = interval
         self.transcriptIds = set([transcript_id])
@@ -53,7 +56,7 @@ class GtfExon:
         self.begin = interval.begin
         self.end = interval.end
 
-    def add(self, transcript_id, gene_id):
+    def add(self, transcript_id, gene_id, number):
 
         if transcript_id not in self.transcriptIds:
             self.transcriptIds.add(transcript_id)
@@ -202,11 +205,18 @@ def parse_reference():
     ref_transcript_dict = {}
     time2 = time.time()
     cnt = 0
+    number = 0
     intron_start = 0
     intron_end = 0
+    prev_transcript_id = None
     for exon in tqdm(reference_exons):
         exon = Exon(exon)
         exon_interval = Interval(exon.start, exon.end + 1)
+        if prev_transcript_id != exon.transcript_id:
+            number = 1
+            prev_transcript_id = exon.transcript_id
+        else:
+            number += 1
         # if cnt % 2 == 1:
         #     intron_end = exon.start + 1
         #     if prev_tran == exon.transcript_id:
@@ -239,8 +249,8 @@ def parse_reference():
         if exon.strand not in ref_chrom_dict[exon.chrom]:
             ref_intervals = IntervalTree()
             ref_exons_dict = {}
-            ref_intervals[exon.start: exon.end + 1] = GtfInterval(exon.id, exon.transcript_id, exon.gene_id)
-            ref_exons_dict[exon.id] = GtfExon(exon_interval, exon.transcript_id, exon.gene_id)
+            ref_intervals[exon.start: exon.end + 1] = GtfInterval(exon.id, exon.transcript_id, exon.gene_id, number)
+            ref_exons_dict[exon.id] = GtfExon(exon_interval, exon.transcript_id, exon.gene_id, number)
 
         else:
             ref_intervals, ref_exons_dict = ref_chrom_dict[exon.chrom][exon.strand]
@@ -252,17 +262,17 @@ def parse_reference():
                     dz = z
                     break
             if not found:
-                ref_intervals[exon.start: exon.end + 1] = GtfInterval(exon.id, exon.transcript_id, exon.gene_id)
+                ref_intervals[exon.start: exon.end + 1] = GtfInterval(exon.id, exon.transcript_id, exon.gene_id, number)
             else:
                 if dz is None:
                     print 'Interval not found'
                     exit(1)
-                dz.add(exon.id, exon.transcript_id, exon.gene_id)
+                dz.add(exon.id, exon.transcript_id, exon.gene_id, number)
 
             if exon.id not in ref_exons_dict:
-                ref_exons_dict[exon.id] = GtfExon(exon_interval, exon.transcript_id, exon.gene_id)
+                ref_exons_dict[exon.id] = GtfExon(exon_interval, exon.transcript_id, exon.gene_id, number)
             else:
-                ref_exons_dict[exon.id].add(exon_interval, exon.transcript_id, exon.gene_id)
+                ref_exons_dict[exon.id].add(exon_interval, exon.transcript_id, exon.gene_id, number)
 
         temp = [ref_intervals, ref_exons_dict]
         ref_chrom_dict[exon.chrom][exon.strand] = temp
@@ -319,7 +329,8 @@ def parse_reference():
 
 def parse_query(num):
     exonbest = open(input_files[num].split('/')[-1] + '.exon', 'w')
-    exonbest.write("ExonID\tCordinates[strand]|Transcript\tType\tBest_Match_Cordinates|Transcript"
+    exonbest.write("ExonID\tQuery(Cordinates[strand]|Transcript[exon_number])\tMatch_Type\t" +
+                   "Reference(Chromosome:Best_Match_Cordinates|Transcript[exon_number])" +
                    "\tShared\tBase_Difference\n")
     gene_strand_count = {}
     tran_strand_count = {}
@@ -327,18 +338,25 @@ def parse_query(num):
     quer_transcript_dict = {}
     quer_gene_dict = {}
     cnt = 0
+    number = 0
+    prev_transcript_id = None
     for exon in tqdm(query_exons[num]):
         cnt += 1
         exon = Exon(exon)
         exon_interval = Interval(exon.start, exon.end + 1)
+        if prev_transcript_id != exon.transcript_id:
+            number = 1
+            prev_transcript_id = exon.transcript_id
+        else:
+            number += 1
         if exon.chrom not in quer_chrom_dict:
             quer_chrom_dict[exon.chrom] = {}
 
         if exon.strand not in quer_chrom_dict[exon.chrom]:
             quer_intervals = IntervalTree()
             quer_exons_dict = {}
-            quer_intervals[exon.start: exon.end + 1] = GtfInterval(exon.id, exon.transcript_id, exon.gene_id)
-            quer_exons_dict[exon.id] = GtfExon(exon_interval, exon.transcript_id, exon.gene_id)
+            quer_intervals[exon.start: exon.end + 1] = GtfInterval(exon.id, exon.transcript_id, exon.gene_id, number)
+            quer_exons_dict[exon.id] = GtfExon(exon_interval, exon.transcript_id, exon.gene_id, number)
 
         else:
             quer_intervals, quer_exons_dict = quer_chrom_dict[exon.chrom][exon.strand]
@@ -350,33 +368,35 @@ def parse_query(num):
                     dz = z
                     break
             if not found:
-                quer_intervals[exon.start: exon.end + 1] = GtfInterval(exon.id, exon.transcript_id, exon.gene_id)
+                quer_intervals[exon.start: exon.end + 1] = GtfInterval(exon.id, exon.transcript_id, exon.gene_id, number)
             else:
                 if dz is None:
                     print 'Interval not found'
                     exit(1)
-                dz.add(exon.id, exon.transcript_id, exon.gene_id)
+                dz.add(exon.id, exon.transcript_id, exon.gene_id, number)
 
             if exon.id not in quer_exons_dict:
-                quer_exons_dict[exon.id] = GtfExon(exon_interval, exon.transcript_id, exon.gene_id)
+                quer_exons_dict[exon.id] = GtfExon(exon_interval, exon.transcript_id, exon.gene_id, number)
             else:
-                quer_exons_dict[exon.id].add(exon_interval, exon.transcript_id, exon.gene_id)
+                quer_exons_dict[exon.id].add(exon_interval, exon.transcript_id, exon.gene_id, number)
 
         temp = [quer_intervals, quer_exons_dict]
         quer_chrom_dict[exon.chrom][exon.strand] = temp
-        bests = match_interval(next(iter(quer_intervals[exon.start: exon.end + 1])), exon.chrom, exon.strand)
-
+        # bests = match_interval(next(iter(quer_intervals[exon.start: exon.end + 1])), exon.chrom, exon.strand)
+        for cinter in quer_intervals[exon_interval]:
+            if cinter.begin == exon_interval.begin and cinter.end == exon_interval.end:
+                bests = match_interval(cinter, exon.chrom, exon.strand)
         if bests:
             for bintr, bval in bests.items():
-                exonbest.write("Exon_" + str(cnt) + "\t" + str(exon.start) + ":" + str(exon.end) + "[" + exon.strand +
-                               "]|" + str(exon.transcript_id) + "\t" + bval[2] + "\t" + str(bintr.begin) + ":" +
-                               str(bintr.end - 1) + "[" + bval[4] + "]|" + ",".join(sorted(bintr.data.transcriptIds))
-                               + "\t" + str(bval[0]) + "\t" + str(exon.start - bintr.begin) + " " +
-                               str(exon.end - bintr.end + 1) + "\n")
+                exonbest.write("Exon_" + str(cnt) + "\t" + str(exon.start) + "-" + str(exon.end) + "[" + exon.strand +
+                               "]|" + str(exon.transcript_id) + "[" + str(number) + "]" + "\t" + bval[2] + "\t"
+                               + exon.chrom + ":" + str(bintr.begin) + "-" + str(bintr.end - 1) + "[" + bval[4] + "]|"
+                               + bintr.data.tran_number + "\t" + str(bval[0]) + "\t(" + str(bintr.begin - exon.start)
+                               + "," + str(exon.end - bintr.end + 1) + ")\n")
         else:
             exonbest.write(
-                "Exon_" + str(cnt) + "\t" + str(exon.start) + ":" + str(exon.end) + "[" + exon.strand + "]|" +
-                str(exon.transcript_id) + "\tNovel" + "\t-" * 4 + "\n")
+                "Exon_" + str(cnt) + "\t" + str(exon.start) + "-" + str(exon.end) + "[" + exon.strand + "]|" +
+                str(exon.transcript_id) + "[" + str(number) + "]" + "\tNovel" + "\t-" * 3 + "\n")
 
         if exon.transcript_id not in quer_transcript_dict:
             quer_transcript_dict[exon.transcript_id] = GtfTranscript(exon_interval, exon.id, exon.gene_id)
@@ -443,7 +463,7 @@ def get_all(chrom_dict, type_, interval):
 
 
 def is_overlapped(feature_1, feature_2):
-    judgement = 'No Overlap'
+    judgement = 'No_Overlap'
     if type(feature_1) is GtfExon:
         start_1 = feature_1.interval.begin
         end_1 = feature_1.interval.end
@@ -473,9 +493,12 @@ def is_overlapped(feature_1, feature_2):
     if start_2 > end_1:
         return [None, judgement]
     if start_1 == start_2 and end_1 == end_2:
-        judgement = '='
+        judgement = 'Pefect_Match'
     else:
-        judgement = 'c'
+        if end_2 > end_1:
+            judgement = 'Overlapped'
+        else:
+            judgement = "Contained"
     if end_2 > end_1:
         return [end_1 - start_2, judgement]
     return [size_2, judgement]
@@ -652,6 +675,7 @@ def match_interval(interval, chrom, stran):
     global ref_matches
     global ref_best_matches
     global ref_chrom_dict
+
     if interval in interval_matches:
         return interval_best_matches[interval]
     found = False
@@ -679,12 +703,19 @@ def match_interval(interval, chrom, stran):
                 found_pos = ref_chrom_dict[chrom]['+'][0][interval]
             if '-' in ref_chrom_dict[chrom]:
                 found_neg = ref_chrom_dict[chrom]['-'][0][interval]
-            if not found_pos and found_neg:
+            if '.' in ref_chrom_dict[chrom]:
+                found_un = ref_chrom_dict[chrom]['.'][0][interval]
+
+            if not found_pos and not found_un and found_neg:
                 found = found_neg
-            elif not found_neg and found_pos:
+                ref_strand = '-'
+            elif not found_neg and not found_un and found_pos:
+                found = found_pos
+                ref_strand = '+'
+            elif not found_neg and not found_pos and found_un:
                 found = found_pos
             else:
-                found = found_pos | found_neg
+                found = found_pos | found_neg | found_un
                 # comp = [x for x in found_pos]
                 # pos_max = map(is_overlapped, comp, itertools.repeat(interval, len(comp)))
                 # ii, pos_max = max(enumerate(pos_max), key=operator.itemgetter(1))
@@ -700,6 +731,8 @@ def match_interval(interval, chrom, stran):
                 #     found = found_neg
                 #
         if found:
+            if interval.end == 126343416:
+                print "GOT FOUND"
             comp = [x for x in found]
             comp_overlaps = map(is_overlapped, comp, itertools.repeat(interval, len(comp)))
             comp_judgements = [x[1] for x in comp_overlaps]
@@ -761,8 +794,9 @@ parse_reference()
 for x in range(len(input_files)):
     quer_chrom_dict = parse_query(x)
     exonbest = open(input_files[x].split('/')[-1] + '.etracking', 'w')
-    exonbest.write("ID\tCordinates[strand]|Transcript\tRef_Cordinates[strand]|Transcript\n")
-    exonbest.write("=>\tType\tStats\n")
+    exonbest.write("ID\tQuery(Cordinates[strand]|Transcript[exon_number])\t"
+                   "Reference(Ref_Cordinates[strand]|Transcript[exon_number])\t")
+    exonbest.write("Type\t(Start,End)\tQuery_Stats\tReference_Stats\n")
     cnt = 0
     reported = set()
     for chrom in quer_chrom_dict:
@@ -775,46 +809,68 @@ for x in range(len(input_files)):
                     reported |= set([eintr])
                     qset = dict()
                     rset = dict()
+                    done = False
+
                     for match in interval_matches[eintr]:
                         rset[match] = interval_matches[eintr][match]
                         for qmatch in ref_matches[match]:
                             qset[qmatch] = ref_matches[match][qmatch]
+                    temp_qset = qset
+                    while not done:
+                        temp_rdict = dict()
+                        temp_qdict = dict()
+                        done = True
+                        for q in temp_qset:
+                            for match in interval_matches[q]:
+                                if match not in rset:
+                                    temp_rdict[match] = interval_matches[q][match]
+                                    for qmatch in ref_matches[match]:
+                                        if qmatch not in qset:
+                                            done = False
+                                            temp_qdict[qmatch] = ref_matches[match][qmatch]
+                        temp_qset = temp_qdict
+                        if temp_qdict:
+                            qset.update(temp_qdict)
+                        if temp_rdict:
+                            rset.update(temp_rdict)
 
                     qset = sorted(qset)
                     rset = sorted(rset)
 
                     if len(qset) == 1 and len(rset) == 1:
-                        mtype = "SRSQ"
+                        mtype = "SQSR"
                         rm = next(iter(rset))
                         qm = next(iter(qset))
-                        cord = "{}:{}[{}]|{}\t".format(eintr.begin, eintr.end - 1, strand, "|".join(eintr.data.transcriptIds))
-                        cord += "r|{}:{}[{}]|{}\t".format(rm.begin, rm.end - 1, ref_matches[rm][qm][4],
-                                                        "|".join(sorted(rm.data.transcriptIds)))
-                        stats = "{} {}".format(eintr.begin - rm.begin, eintr.end - rm.end)
+                        cord = "{}-{}[{}]|{}\t".format(eintr.begin, eintr.end - 1, strand,
+                                                            "|".join(sorted(eintr.data.transcriptIds)))
+                        cord += "r|{}-{}[{}]|{}\t".format(rm.begin, rm.end - 1, ref_matches[rm][qm][4],
+                                                            "|".join(sorted(rm.data.transcriptIds)))
+                        stats = "({},{})\t-\t-".format(rm.begin - eintr.begin, eintr.end - rm.end)
 
                     elif len(qset) == 1 and len(rset) > 1:
-                        mtype = "MRSQ"
+                        mtype = "SQMR"
                         start = 10000*10000
                         end = 0
                         qm = next(iter(qset))
-                        cord = "{}:{}[{}]|{}\t".format(eintr.begin, eintr.end - 1, strand, "|".join(eintr.data.transcriptIds))
+                        cord = "{}-{}[{}]|{}\t".format(eintr.begin, eintr.end - 1, strand,
+                                                       "|".join(sorted(eintr.data.transcriptIds)))
                         stat = ""
                         began = False
                         for bintr in rset:
-                            cord += "r|{}:{}[{}]|{}, ".format(bintr.begin, bintr.end - 1, ref_matches[bintr][qm][4],
-                                                            "|".join(sorted(bintr.data.transcriptIds)))
+                            cord += "r|{}-{}[{}]|{}, ".format(bintr.begin, bintr.end - 1, ref_matches[bintr][qm][4],
+                                                              "|".join(sorted(bintr.data.transcriptIds)))
                             if began:
-                                stat += str(bintr.begin - prev_end) + " "
+                                stat += str(prev_end - bintr.begin) + " "
                             else:
                                 began = True
                             start = min(start, bintr.begin)
                             end = max(end, bintr.end)
                             prev_end = bintr.end - 1
                         cord = cord[:-2]
-                        stats = "{} {}{}".format(eintr.begin - start, stat, eintr.end - end)
+                        stats = "({},{})\t-\t[{}]".format(start - eintr.begin, eintr.end - end, stat)
 
                     elif len(qset) > 1 and len(rset) == 1:
-                        mtype = "SRMQ"
+                        mtype = "MQSR"
                         start = 10000 * 10000
                         end = 0
                         rm = next(iter(rset))
@@ -823,69 +879,70 @@ for x in range(len(input_files)):
                         began = False
                         for bintr in qset:
                             reported |= set([bintr])
-                            cord += "{}:{}[{}]|{}, ".format(bintr.begin, bintr.end - 1, interval_matches[bintr][rm][3],
+                            cord += "{}-{}[{}]|{}, ".format(bintr.begin, bintr.end - 1, interval_matches[bintr][rm][3],
                                                             "|".join(sorted(bintr.data.transcriptIds)))
                             if began:
-                                stat += str(bintr.begin - prev_end) + " "
+                                stat += str(prev_end - bintr.begin) + " "
                             else:
                                 began = True
                             start = min(start, bintr.begin)
                             end = max(end, bintr.end)
                             prev_end = bintr.end - 1
                         cord = cord[:-2]
-                        cord += "\tr|{}:{}[{}]|{}".format(rm.begin, rm.end - 1, ref_matches[rm][qset[0]][4],
-                                                       "|".join(rm.data.transcriptIds))
-                        stats = "{} {}{}".format(start - rm.begin, stat, end - rm.end)
+                        cord += "\tr|{}-{}[{}]|{}".format(rm.begin, rm.end - 1, ref_matches[rm][qset[0]][4],
+                                                       "|".join(sorted(rm.data.transcriptIds)))
+                        stats = "({},{})\t[{}]\t-".format(rm.begin - start, end - rm.end, stat)
 
                     elif len(qset) > 1 and len(rset) > 1:
-                        mtype = "MRMQ"
+                        mtype = "MQMR"
                         qstart = 10000 * 10000
                         qend = 0
                         cord = ""
-                        stat = ""
+                        qstat = ""
                         began = False
-                        gabs = {}
+                        rgabs = {}
+                        qgabs = {}
                         for bintr in qset:
                             reported.add(bintr)
-                            if bintr.begin == 72360110:
-                                print bintr
-                                print eintr
-                            cord += "{}:{}[{}]|{}, ".format(bintr.begin, bintr.end - 1, strand,
+
+                            cord += "{}-{}[{}]|{}, ".format(bintr.begin, bintr.end - 1, strand,
                                                             "|".join(sorted(bintr.data.transcriptIds)))
                             if began:
-                                stat += str(bintr.begin - prev_end) + " "
-                                gabs[str(bintr.begin)+":"+str(prev_end)] = str(bintr.begin - prev_end)
+                                qstat += str(prev_end - bintr.begin) + " "
+                                qgabs[str(bintr.begin)+":"+str(prev_end)] = str(bintr.begin - prev_end)
                             else:
                                 began = True
                             qstart = min(qstart, bintr.begin)
                             qend = max(qend, bintr.end)
                             prev_end = bintr.end - 1
                         cord = cord[:-2]
-                        stat += " R"
+                        rstat = ""
                         rstart = 10000 * 10000
                         rend = 0
                         began = False
                         for bintr in rset:
-                            cord += "\tr|{}:{}[{}]|{}, ".format(bintr.begin, bintr.end - 1, strand,
+                            cord += "\tr|{}-{}[{}]|{}, ".format(bintr.begin, bintr.end - 1, strand,
                                                             "|".join(sorted(bintr.data.transcriptIds)))
                             if began:
-                                stat += str(bintr.begin - prev_end) + " "
-                                gabs[str(bintr.begin)+":"+str(prev_end)] = str(bintr.begin - prev_end)+"R"
+                                rstat += str(prev_end - bintr.begin) + " "
+                                rgabs[str(bintr.begin)+":"+str(prev_end)] = str(bintr.begin - prev_end)
                             else:
                                 began = True
                             rstart = min(rstart, bintr.begin)
                             rend = max(rend, bintr.end)
                             prev_end = bintr.end - 1
                         cord = cord[:-2]
-                        stat = [gabs[k] for k in sorted(gabs.keys())]
-                        stats = "{} {} {}".format(qstart - rstart, " ".join(stat), qend - rend)
+                        rstat = [rgabs[k] for k in sorted(rgabs.keys())]
+                        qstat = [qgabs[k] for k in sorted(qgabs.keys())]
+                        stats = "({},{})\t[{}]\t[{}]".format(rstart - qstart, qend - rend, " ".join(qstat),
+                                                             " ".join(rstat))
 
                     exonbest.write("id_{}\t{}\t".format(cnt, cord))
-                    exonbest.write("=>\t{}\t{}\n".format(mtype, stats))
+                    exonbest.write("{}\t{}\n".format(mtype, stats))
                 else:
-                    exonbest.write("id_{}\t{}:{}[{}]|{}\t-\t".format(cnt, eintr.begin, eintr.end, strand,
+                    exonbest.write("id_{}\t{}-{}[{}]|{}\t-\t".format(cnt, eintr.begin, eintr.end - 1, strand,
                                                                      ",".join(eintr.data.transcriptIds)))
-                    exonbest.write("=>\tNRSQ\t-\n")
+                    exonbest.write("SQNR\t-\t-\t-\n")
 
     # loci, super_loci = find_super_loci(quer_chrom_dict)
     # write_loci_file(quer_chrom_dict, loci, super_loci, x)
