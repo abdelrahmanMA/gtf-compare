@@ -794,7 +794,7 @@ parse_reference()
 for x in range(len(input_files)):
     quer_chrom_dict = parse_query(x)
     exonbest = open(input_files[x].split('/')[-1] + '.etracking', 'w')
-    exonbest.write("ID\tQuery(Cordinates[strand]|Transcript[exon_number])\t"
+    exonbest.write("ID\tChromosome\tQuery(Cordinates[strand]|Transcript[exon_number])\t"
                    "Reference(Ref_Cordinates[strand]|Transcript[exon_number])\t")
     exonbest.write("Type\t(Start,End)\tQuery_Stats\tReference_Stats\n")
     cnt = 0
@@ -937,10 +937,10 @@ for x in range(len(input_files)):
                         stats = "({},{})\t[{}]\t[{}]".format(rstart - qstart, qend - rend, " ".join(qstat),
                                                              " ".join(rstat))
 
-                    exonbest.write("id_{}\t{}\t".format(cnt, cord))
+                    exonbest.write("id_{}\t{}\t{}\t".format(cnt, chrom, cord))
                     exonbest.write("{}\t{}\n".format(mtype, stats))
                 else:
-                    exonbest.write("id_{}\t{}-{}[{}]|{}\t-\t".format(cnt, eintr.begin, eintr.end - 1, strand,
+                    exonbest.write("id_{}\t{}\t{}-{}[{}]|{}\t-\t".format(cnt, chrom, eintr.begin, eintr.end - 1, strand,
                                                                      ",".join(eintr.data.transcriptIds)))
                     exonbest.write("SQNR\t-\t-\t-\n")
 
