@@ -49,13 +49,16 @@ class Exon(gffutils.Feature):
 class GtfInterval:
     """Represents a GTF Interval"""
 
-    def __init__(self, interval, exon_id, transcript_id, number, gene_id, strand):
+    def __init__(self, interval, exon, number):
 
         self.interval = interval
-        self.exonIds = {exon_id}
-        self.transcriptIds = {transcript_id: number}
-        self.geneIds = {gene_id}
-        self.strand = strand
+        self.begin = self.interval.begin
+        self.end = self.interval.end
+        self.exonIds = {exon.id}
+        self.transcriptIds = {exon.transcript_id: number}
+        self.geneIds = {exon.gene_id}
+        self.strand = exon.strand
+        self.chrom = exon.chrom
         self.note = None
 
     def add(self, exon_id, transcript_id, number, gene_id):
@@ -82,6 +85,10 @@ class GtfExon:
 
         self.id = _id
         self.gtf_interval = gtf_interval
+        self.begin = self.gtf_interval.begin
+        self.end = self.gtf_interval.end
+        self.strand = self.gtf_interval.strand
+        self.chrom = self.gtf_interval.chrom
         self.transcript_id = transcript_id
         self.gene_id = gene_id
 
@@ -196,6 +203,30 @@ def parse_database():
     reference_exons = refdb.features_of_type('exon')
 
 
+def write_last_exon(cnt, dotexon, quer_intervals, last_exon):
+    """Writes the last exon in .exon file"""
+    # retrives the interval object to match it to reference
+    for cinter in quer_intervals.search(last_exon.begin, last_exon.end, strict=True):
+        if cinter.begin == last_exon.begin and cinter.end == last_exon.end:
+            # get the best reference match
+            bests = match_interval(cinter, last_exon.chrom, last_exon.strand)
+            break
+    # If a match (best match) was found write each match in .exon file
+    if bests:
+        for bintr, bval in bests.items():
+            dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\t{}\t{}-{}[{}]|{}\t{}\t({},{})\t({})\n'.format(
+                cnt - 1, last_exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, last_exon.transcript_id,
+                cinter.data.transcriptIds[last_exon.transcript_id], bval[1], bintr.begin, bintr.end - 1,
+                bintr.data.strand, '|'.join(['{}[{}]'.format(k, v) for k, v in bintr.data.transcriptIds.items()]),
+                bval[0], bintr.begin - cinter.begin, cinter.end - bintr.end, NOTES[cinter.data.note]
+            ))
+    else:
+        dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\tNovel\t-\t-\t-\t-\n'.format(
+            cnt - 1, last_exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, last_exon.transcript_id,
+            cinter.data.transcriptIds[last_exon.transcript_id]
+        ))
+
+
 def parse_reference():
     """Generates Reference stats and constructs reference dictionaries"""
     global reference_exons
@@ -205,7 +236,7 @@ def parse_reference():
     # Next line defines a variable which will be used to calculate exonic unique length
     ref_ulen = {'+': IntervalTree(), '-': IntervalTree(), '.': IntervalTree()}
     # Next line defines a variable which will be used to calculate reference statistics
-    REF_STATS = {'Total_Exons': [], 'Unique_Exons': [], '5_Prime_Utr': 0, '3_Prime_Utr': 0, 'intronic_edge': 0}
+    REF_STATS = {'Total_Exons': [], 'Unique_Exons': [], '5_Prime_UTR': 0, '3_Prime_UTR': 0, 'Intronic_Edges': 0}
 
     gene_strand_count = {}
     tran_strand_count = {}
@@ -224,21 +255,17 @@ def parse_reference():
         exon_interval = Interval(exon.begin, exon.end + 1)
 
         # Calculates Unique length
-        # Checks if the current interval overlapps with any interval in the unique length dictionary
-        if ref_ulen[exon.strand][exon_interval]:
-            mn = 10000 * 400000
-            mx = 0
-            # Loops over all overlapping intervals removes them
-            for b, e, d in ref_ulen[exon.strand][exon_interval]:
-                if b < mn:
-                    mn = b
-                if e > mx:
-                    mx = e
-                ref_ulen[exon.strand].removei(b, e, d)
-            # Adds and interval to unique length starting from smallest start to the largest end
-            ref_ulen[exon.strand].addi(mn, mx)
-        else:
-            ref_ulen[exon.strand].add(exon_interval)
+        mn = exon.begin
+        mx = exon.end + 1
+        # Loops over all overlapping intervals removes them
+        for b, e, d in ref_ulen[exon.strand][mn - 1:mx]:
+            if b < mn:
+                mn = b
+            if e > mx:
+                mx = e
+            ref_ulen[exon.strand].removei(b, e, d)
+        # Adds and interval to unique length starting from smallest start to the largest end
+        ref_ulen[exon.strand].addi(mn, mx, i)
 
         # Checks if the current exon in a new transcript
         if prev_transcript_id != exon.transcript_id:
@@ -248,8 +275,8 @@ def parse_reference():
                 else:
                     last_interval.transcriptIds[prev_transcript_id] = 'Last'
 
-                REF_STATS['intronic_edge'] -= 1
-                REF_STATS['3_Prime_Utr'] += 1
+                REF_STATS['Intronic_Edges'] -= 1
+                REF_STATS['3_Prime_UTR'] += 1
             number = 'First'
             prev_transcript_id = exon.transcript_id
 
@@ -271,17 +298,17 @@ def parse_reference():
 
         REF_STATS['Total_Exons'].append(exon.size)
         if number == 'Single':
-            REF_STATS['5_Prime_Utr'] += 1
-            REF_STATS['3_Prime_Utr'] += 1
+            REF_STATS['5_Prime_UTR'] += 1
+            REF_STATS['3_Prime_UTR'] += 1
         elif number == 'First':
-            REF_STATS['5_Prime_Utr'] += 1
-            REF_STATS['intronic_edge'] += 1
+            REF_STATS['5_Prime_UTR'] += 1
+            REF_STATS['Intronic_Edges'] += 1
         elif number == 'Last':
-            REF_STATS['intronic_edge'] += 1
-            REF_STATS['3_Prime_Utr'] += 1
+            REF_STATS['Intronic_Edges'] += 1
+            REF_STATS['3_Prime_UTR'] += 1
         else:
-            REF_STATS['intronic_edge'] += 1
-            REF_STATS['intronic_edge'] += 1
+            REF_STATS['Intronic_Edges'] += 1
+            REF_STATS['Intronic_Edges'] += 1
 
         if intron_start and intron_end:
             ref_introns[intron_start:intron_end] = exon.strand
@@ -305,9 +332,9 @@ def parse_reference():
             ref_intervals = IntervalTree()
             ref_exons_dict = {}
 
-            last_interval = GtfInterval(exon_interval, exon.id, exon.transcript_id, number, exon.gene_id, exon.strand)
+            last_interval = GtfInterval(exon_interval, exon, number)
             ref_intervals[exon.start: exon.end + 1] = last_interval
-            REF_STATS['Unique_Exons'].append(exon.size)
+            # REF_STATS['Unique_Exons'].append(exon.size)
 
             last_exon = GtfExon(exon.id, last_interval, exon.transcript_id, exon.gene_id)
             ref_exons_dict[exon.id] = last_exon
@@ -325,9 +352,9 @@ def parse_reference():
                     break
             # Means the interval didn't exist
             if not found:
-                last_interval = GtfInterval(exon_interval, exon.id, exon.transcript_id, number, exon.gene_id, exon.strand)
+                last_interval = GtfInterval(exon_interval, exon, number)
                 ref_intervals[exon.begin: exon.end + 1] = last_interval
-                REF_STATS['Unique_Exons'].append(exon.size)
+                # REF_STATS['Unique_Exons'].append(exon.size)
             else:
                 if dz is None:
                     print('Interval not found')
@@ -381,8 +408,8 @@ def parse_reference():
     else:
         last_interval.transcriptIds[prev_transcript_id] = 'Last'
 
-    REF_STATS['intronic_edge'] -= 1
-    REF_STATS['3_Prime_Utr'] += 1
+    REF_STATS['Intronic_Edges'] -= 1
+    REF_STATS['3_Prime_UTR'] += 1
 
     for chromo in ref_chrom_dict:
         for strand in ref_chrom_dict[chromo]:
@@ -409,20 +436,27 @@ def parse_reference():
                 strand = '.'
             ref_chrom_dict[chromo][strand][3][gene] = ref_gene_dict[gene]
 
+    # Write temporarily Reference stats file
     with open('refstat.txt', 'w') as refstatf:
-        size = 0
+        wf = False
         for st in ['+', '-', '.']:
             for b, e, d in ref_ulen[st]:
-                size += e - b
+                REF_STATS['Unique_Exons'].append(e - b)
         for key, value in REF_STATS.items():
             if 'Exons' in key:
                 val = np.array(value)
-                val2 = val.sum()
-                if key == 'Unique_Exons':
-                    val2 = size
-                refstatf.write('{}\t{}|{}|{}|{}\n'.format(key, len(val), val2, round(val.mean(), 1), round(val.std(), 1)))
+                refstatf.write('{}(count|total|mean|std)\t{}|{}|{}|{}\n'.
+                               format(key, len(val), val.sum(), round(val.mean(), 1), round(val.std(), 1)))
             else:
-                refstatf.write('{}\t{}\n'.format(key, value))
+                if key == '5_Prime_UTR':
+                    if value == REF_STATS['3_Prime_UTR']:
+                        continue
+                    else:
+                        print('Something went wrong with stats UTRS don\'t match')
+                        wf = True
+                if key == '3_Prime_UTR' and not wf:
+                    key = 'Transcripts'
+                refstatf.write('{}(count)\t{}\n'.format(key, value))
     # return ref_chrom_dict
 
 
@@ -464,23 +498,35 @@ def parse_query(num):
         cnt += 1
         exon = Exon(exon)
         exon_interval = Interval(exon.begin, exon.end + 1)
+
         # Checks if the current exon in a new transcript
         if prev_transcript_id != exon.transcript_id:
             if last_interval:
                 if number == 'First' or (number == 'Last' and prev_strand == '-'):
                     last_interval.transcriptIds[prev_transcript_id] = 'Single'
                 else:
-                    if prev_strand == '-':
+                    if prev_strand == '-' and reverse:
                         last_interval.transcriptIds[prev_transcript_id] = 'First'
                     else:
                         last_interval.transcriptIds[prev_transcript_id] = 'Last'
             if exon.strand == '-':
                 number = 'Last'
+                assumed = True
+                reverse = True
             else:
                 number = 'First'
             prev_transcript_id = exon.transcript_id
         else:
+            if exon.strand == '-':
+                if assumed:
+                    if prev_strand == '-' and last_interval.end > exon.begin:
+                        last_interval.transcriptIds[exon.transcript_id] = 'First'
+                        reverse = False
+                    assumed = False
             number = 'Mid'
+
+        if cnt > 1:
+            write_last_exon(cnt, dotexon, quer_intervals, last_exon)
 
         # Creates a dictionary for the chromosome if it didn't exist
         if exon.chrom not in quer_chrom_dict:
@@ -492,7 +538,7 @@ def parse_query(num):
             quer_intervals = IntervalTree()
             quer_exons_dict = {}
 
-            last_interval = GtfInterval(exon_interval, exon.id, exon.transcript_id, number, exon.gene_id, exon.strand)
+            last_interval = GtfInterval(exon_interval, exon, number)
             quer_intervals[exon.start: exon.end + 1] = last_interval
 
             last_exon = GtfExon(exon.id, last_interval, exon.transcript_id, exon.gene_id)
@@ -511,7 +557,7 @@ def parse_query(num):
                     break
             # Means the interval didn't exist
             if not found:
-                last_interval = GtfInterval(exon_interval, exon.id, exon.transcript_id, number, exon.gene_id, exon.strand)
+                last_interval = GtfInterval(exon_interval, exon, number)
                 quer_intervals[exon.begin: exon.end + 1] = last_interval
             else:
                 if dz is None:
@@ -529,36 +575,6 @@ def parse_query(num):
                 print('Duplicate Exon ID', exon.id, exon_interval)
 
         quer_chrom_dict[exon.chrom][exon.strand] = [quer_intervals, quer_exons_dict]
-
-        # retrives the interval object to match it to reference
-        for cinter in quer_intervals.search(exon.begin, exon.end + 1, strict=True):
-            if cinter.begin == exon_interval.begin and cinter.end == exon_interval.end:
-                # get the best reference match
-                bests = match_interval(cinter, exon.chrom, exon.strand)
-                break
-        # If a match (best match) was found write each match in .exon file
-        if bests:
-            for bintr, bval in bests.items():
-                dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\t{}\t{}-{}[{}]|{}\t{}\t({},{})\t({})\n'.format(
-                    cnt, exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, exon.transcript_id,
-                    cinter.data.transcriptIds[exon.transcript_id], bval[1], bintr.begin, bintr.end - 1,
-                    bintr.data.strand, '|'.join(['{}[{}]'.format(k, v) for k, v in bintr.data.transcriptIds.items()]),
-                    bval[0], bintr.begin - cinter.begin, cinter.end - bintr.end, NOTES[cinter.data.note]
-                ))
-                # exonbest.write("Exon_" + str(cnt) + "\t" + exon.chrom + "\t" + str(exon.start) + "-" + str(exon.end)
-                #                + "[" + exon.strand + "]|" + str(exon.transcript_id) + "[" + str(number) + "]"
-                #                + "\t" + bval[2] + "\t" + str(bintr.begin) + "-" + str(bintr.end - 1) + "[" + bval[4]
-                #                + "]|" + bintr.data.tran_number + "\t" + str(bval[0]) + "\t("
-                #                + str(bintr.begin - exon.start) + "," + str(exon.end - bintr.end + 1) + ")\n")
-        else:
-            dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\tNovel\t-\t-\t-\t-\n'.format(
-                cnt, exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, exon.transcript_id,
-                cinter.data.transcriptIds[exon.transcript_id]
-            ))
-            # exonbest.write(
-            #     "Exon_" + str(cnt) + "\t" + exon.chrom + "\t" + str(exon.start) + "-" + str(exon.end) +
-            #     "[" + exon.strand + "]|" + str(exon.transcript_id) + "[" + str(number) + "]" +
-            #     "\tNovel" + "\t-" * 3 + "\n")
 
         if exon.transcript_id not in quer_transcript_dict:
             last_transcript = GtfTranscript(exon.transcript_id, last_exon, exon.gene_id)
@@ -596,7 +612,7 @@ def parse_query(num):
     if number == 'First' or (number == 'Last' and prev_strand == '-'):
         last_interval.transcriptIds[prev_transcript_id] = 'Single'
     else:
-        if prev_strand == '-':
+        if prev_strand == '-' and reverse:
             last_interval.transcriptIds[prev_transcript_id] = 'First'
         else:
             last_interval.transcriptIds[prev_transcript_id] = 'Last'
@@ -625,7 +641,8 @@ def parse_query(num):
             else:
                 strand = '.'
             quer_chrom_dict[chromo][strand][3][gene] = quer_gene_dict[gene]
-
+    # Write the very last exon to .exon file
+    write_last_exon(cnt + 1, dotexon, quer_intervals, last_exon)
     return quer_chrom_dict
 
 
@@ -985,8 +1002,8 @@ def write_itrack(num, quer_chrom_dict):
     itrack = open(input_files[num].split('/')[-1] + '.itracking', 'w')
     # Write header
     itrack.write("ID\tChromosome\tQuery(Coordinates[strand]|Transcript[exon_number])\t"
-                 "Reference(Ref_Coordinates[strand]|Transcript[exon_number])\tType\t(Start,End)\t[Query_Stats]"
-                 "\t[Reference_Stats]\tNotes\n")
+                 "Reference(Ref_Coordinates[strand]|Transcript[exon_number])\tType\t(Start,End)\t[Query_Structure]"
+                 "\t[Reference_Structure]\tNotes\n")
     # Index for each row
     cnt = 0
     # To hold reported intervals not to report them again
@@ -1014,9 +1031,10 @@ def write_itrack(num, quer_chrom_dict):
 
                     # Add note for the unknown strand if found on both reference strands
                     if len(interval_best_matches[interval]) > 1 and interval.data.note == 7:
-                        note = '(A best match on both strands was found only used {} (arbitrary decision))'.format(ref_st)
+                        note = '(A best match on both strands was found only used {} (arbitrary decision))'.format(
+                            ref_st)
                     else:
-                        note = '-'
+                        note = '({})'.format(NOTES[interval.data.note])
 
                     # Loop over the query intervals and find all reference matches and query matches
                     tempset = qset.copy()
@@ -1075,7 +1093,7 @@ def write_itrack(num, quer_chrom_dict):
                                 qstart = qm.begin
                                 qend = qm.end
                             if qm.end <= qend and i != 0:
-                                if note == '-':
+                                if note == '(-)':
                                     note = '(Total Overlap occured at query number '
                                 elif note[-1] == ')':
                                     note = note[:-1] + ' Total Overlap occured at query number '
@@ -1111,7 +1129,7 @@ def write_itrack(num, quer_chrom_dict):
                                 rstart = rm.begin
                                 rend = rm.end
                             if rm.end <= rend and i != 0:
-                                if note == '-':
+                                if note == '(-)':
                                     note = '(Total Overlap occured at reference number '
                                 elif note[-1] == ')':
                                     note = note[:-1] + ' Total Overlap occured at reference number '
@@ -1127,7 +1145,7 @@ def write_itrack(num, quer_chrom_dict):
                     if mtype == 'SQSR':
                         if note != '-':
                             note = '({}, {})'.format(note.replace('(', '').replace(')', ''), NOTES[qm.data.note])
-                        else:
+                        elif qm.data.note != 0:
                             note = '({})'.format(NOTES[qm.data.note])
 
                     start = rstart - qstart
@@ -1141,11 +1159,11 @@ def write_itrack(num, quer_chrom_dict):
                             lvl = 'Intronic'
                     if interval.data.strand != strand:
                         print('SOMETHING IS WRONG STRANDS DOESN\'t MATCH Code: 2')
-                    itrack.write("id_{}\t{}\t{}-{}[{}][{}]|{}\t-\t".format(
-                        cnt, chrom, interval.begin, interval.end - 1, interval.data.strand, lvl,
+                    itrack.write("id_{}\t{}\t{}-{}[{}]|{}\t-\t".format(
+                        cnt, chrom, interval.begin, interval.end - 1, interval.data.strand,
                         '|'.join(['{}[{}]'.format(k, v) for k, v in interval.data.transcriptIds.items()])
                     ))
-                    itrack.write("SQNR\t-\t-\t-\t-\n")
+                    itrack.write("SQNR\t-\t-\t-\t[{}]\n".format(lvl))
 
 
 argument_parser()
