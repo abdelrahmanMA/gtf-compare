@@ -4,6 +4,8 @@ import time
 from intervaltree import IntervalTree, Interval
 import csv
 
+np.seterr(divide='ignore', invalid='ignore')
+
 def get_gap_overlap(type1, type2):
     if type1 == 'Single' or type1 == 'Last':
         first = '3'
