@@ -393,22 +393,22 @@ for _file in files:
 
         print(_file, time.time() - time1)
 
-with open('stats.csv', 'w') as write:
-    write = csv.writer(write, delimiter='\t', quotechar=',')
+with open('stats.txt', 'w') as write:
+    # write = csv.writer(write, delimiter='\t', quotechar=',')
     with open('refstat.txt', 'r') as rr:
         lines = rr.readlines()
         for line in lines:
-            write.writerow('REF_' + line)
+            write.write('REF_' + line)
     lines = [''] * 3
 
-    for asm in ['stringtie', 'scallop', 'trinity']:
-        lines[0] += '\t' * 4 + asm + '\t#'
-        lines[1] += '\t' * 2 + 'poly' + '\t' * 3 + 'ribo' + '\t#'
-        lines[2] += '\t' * 1 + 'brain' + '\t' * 1 + 'tumor'
-        lines[2] += '\t' * 1 + 'brain' + '\t' * 1 + 'tumor' + '\t#'
-    for l in lines:
-        write.writerow(l)
-        write.writerow('\n')
+    # for asm in ['stringtie', 'scallop', 'trinity']:
+    #     lines[0] += '\t' * 4 + asm + '\t#'
+    #     lines[1] += '\t' * 2 + 'poly' + '\t' * 3 + 'ribo' + '\t#'
+    #     lines[2] += '\t' * 1 + 'brain' + '\t' * 1 + 'tumor'
+    #     lines[2] += '\t' * 1 + 'brain' + '\t' * 1 + 'tumor' + '\t#'
+    # for l in lines:
+    #     write.write(l)
+    #     write.write('\n')
     lines = [''] * 119
     lines[0] = 'Total_Exons(count|total|mean|std)\t'
     lines[1] = 'Unique_Exons(count|total|mean|std)\t'
@@ -464,130 +464,134 @@ with open('stats.csv', 'w') as write:
                     lines[xx] = '{}_{}_{}(count(%)|total(%)|mean|std)\t'.format(stat, go, sstat)
                     xx += 1
 
-    for asm in ['stringtie', 'scallop', 'trinity']:
-        for lib in ['poly', 'ribo']:
-            for sample in ['brain', 'tumor']:
-                for _file in stats:
-                    if asm in _file and lib in _file and sample in _file:
+    # for asm in ['stringtie', 'scallop', 'trinity']:
+    #     for lib in ['poly', 'ribo']:
+    #         for sample in ['brain', 'tumor']:
+    for _file in stats:
+                    # if asm in _file and lib in _file and sample in _file:
 
-                        val = stats[_file]['count_t']
+        val = stats[_file]['count_t']
+        val = np.array(val)
+        lines[0] += '{}|{}|{}|{}\t'.format(len(val), val.sum(),
+                                            round(val.mean(), 1), round(val.std(), 1))
+        val = stats[_file]['count_u']
+        val = np.array(val)
+        # val2 = sum(stats[_file]['ulength'])
+        lines[1] += '{}|{}|{}|{}\t'.format(len(val), val.sum(),
+                                            round(val.mean(), 1), round(val.std(), 1))
+        val, val2 = stats[_file]['5_prime_utr'][0], stats[_file]['3_prime_utr'][0]
+        if val != val2:
+            print('UTRs don\'t match', val, val2)
+        lines[2] += '{}\t'.format(val)
+        val = stats[_file]['intronic_edge'][0]
+        lines[3] += '{}\t'.format(val)
+
+        xx = 4
+        for stat in ['SQNR', 'SQSR', 'SQMR', 'MQSR', 'MQMR']:
+            for tt in ['count_t', 'count_u']:
+                val = stats[_file][stat][tt]
+                val = np.array(val)
+                # if tt == 'count_u':
+                #     val2 = sum(stats[_file][stat]['ulength'])
+                # else:
+                #     val2 = val.sum()
+                perc = len(val) * 100.0 / len(stats[_file][tt])
+                pert = sum(val) * 100.0 / sum(stats[_file][tt])
+                lines[xx] += '{}({})|{}({})|{}|{}\t'.format(len(val), round(perc, rnd), val.sum(),
+                                                            round(pert, rnd), round(val.mean(), rnd),
+                                                            round(val.std(), rnd))
+                xx += 1
+
+                if stat == 'SQNR':
+                    for sstat in ['Intronic', 'Intergenic']:
+                        val = stats[_file][stat][sstat][tt]
                         val = np.array(val)
-                        lines[0] += '{}|{}|{}|{}\t'.format(len(val), val.sum(),
-                                                           round(val.mean(), 1), round(val.std(), 1))
-                        val = stats[_file]['count_u']
+                        perc = len(val) * 100.0 / len(stats[_file][stat][tt])
+                        pert = sum(val) * 100.0 / sum(stats[_file][stat][tt])
+                        lines[xx] += '{}({})|{}({})|{}|{}\t'.format(len(val), round(perc, rnd),
+                                                                    val.sum(), round(pert, rnd),
+                                                                    round(val.mean(), rnd),
+                                                                    round(val.std(), rnd))
+                        xx += 1
+                elif tt == 'count_t':
+                    for mutr in ['5_prime_utr', '3_prime_utr', 'intronic_edge']:
+                        val = stats[_file][stat][mutr][2]
+                        per = val * 100.0 / stats[_file][mutr][2]
+                        lines[xx] += '{}({})\t'.format(val, round(per, rnd))
+                        xx += 1
+
+            if stat != 'SQNR':
+                for mutr in ['5_prime_utr', '3_prime_utr', 'intronic_edge']:
+                    val2 = stats[_file][stat][mutr][3]
+                    perc = len(val2) * 100.0 / len(stats[_file][mutr][3])
+                    pert = sum(val2) * 100.0 / sum(stats[_file][mutr][3])
+                    sval2 = stats[_file][stat][mutr + '_u']
+                    lines[xx] += '{}({})|{}({})\t'.format(sval2, round(perc, rnd),
+                                                            sum(val2), round(pert, rnd))
+                    xx += 1
+                    mutr = mutr.replace('utr', 'ch').replace('edge', 'ch')
+                    for k in range(2):
+                        val = stats[_file][stat][mutr][k]
                         val = np.array(val)
-                        # val2 = sum(stats[_file]['ulength'])
-                        lines[1] += '{}|{}|{}|{}\t'.format(len(val), val.sum(),
-                                                           round(val.mean(), 1), round(val.std(), 1))
-                        val, val2 = stats[_file]['5_prime_utr'][0], stats[_file]['3_prime_utr'][0]
-                        if val != val2:
-                            print('UTRs don\'t match', val, val2)
-                        lines[2] += '{}\t'.format(val)
-                        val = stats[_file]['intronic_edge'][0]
-                        lines[3] += '{}\t'.format(val)
-
-                        xx = 4
-                        for stat in ['SQNR', 'SQSR', 'SQMR', 'MQSR', 'MQMR']:
-                            for tt in ['count_t', 'count_u']:
-                                val = stats[_file][stat][tt]
-                                val = np.array(val)
-                                # if tt == 'count_u':
-                                #     val2 = sum(stats[_file][stat]['ulength'])
-                                # else:
-                                #     val2 = val.sum()
-                                perc = len(val) * 100.0 / len(stats[_file][tt])
-                                pert = sum(val) * 100.0 / sum(stats[_file][tt])
-                                lines[xx] += '{}({})|{}({})|{}|{}\t'.format(len(val), round(perc, rnd), val.sum(),
-                                                                            round(pert, rnd), round(val.mean(), rnd),
-                                                                            round(val.std(), rnd))
-                                xx += 1
-
-                                if stat == 'SQNR':
-                                    for sstat in ['Intronic', 'Intergenic']:
-                                        val = stats[_file][stat][sstat][tt]
-                                        val = np.array(val)
-                                        perc = len(val) * 100.0 / len(stats[_file][stat][tt])
-                                        pert = sum(val) * 100.0 / sum(stats[_file][stat][tt])
-                                        lines[xx] += '{}({})|{}({})|{}|{}\t'.format(len(val), round(perc, rnd),
-                                                                                    val.sum(), round(pert, rnd),
-                                                                                    round(val.mean(), rnd),
-                                                                                    round(val.std(), rnd))
-                                        xx += 1
-                                elif tt == 'count_t':
-                                    for mutr in ['5_prime_utr', '3_prime_utr', 'intronic_edge']:
-                                        val = stats[_file][stat][mutr][2]
-                                        per = val * 100.0 / stats[_file][mutr][2]
-                                        lines[xx] += '{}({})\t'.format(val, round(per, rnd))
-                                        xx += 1
-
-                            if stat != 'SQNR':
-                                for mutr in ['5_prime_utr', '3_prime_utr', 'intronic_edge']:
-                                    val2 = stats[_file][stat][mutr][3]
-                                    perc = len(val2) * 100.0 / len(stats[_file][mutr][3])
-                                    pert = sum(val2) * 100.0 / sum(stats[_file][mutr][3])
-                                    sval2 = stats[_file][stat][mutr + '_u']
-                                    lines[xx] += '{}({})|{}({})\t'.format(sval2, round(perc, rnd),
-                                                                          sum(val2), round(pert, rnd))
-                                    xx += 1
-                                    mutr = mutr.replace('utr', 'ch').replace('edge', 'ch')
-                                    for k in range(2):
-                                        val = stats[_file][stat][mutr][k]
-                                        val = np.array(val)
-                                        vl = stats[_file][stat][mutr + '_u'][k]
-                                        perc = vl * 100.0 / sval2
-                                        pert = sum(val) * 100.0 / sum(val2)
-                                        lines[xx] += '{}({})|{}({})|{}|{}\t'.format(vl, round(perc, rnd),
-                                                                                    val.sum(), round(pert, rnd),
-                                                                                    round(val.mean(), rnd),
-                                                                                    round(val.std(), rnd))
-                                        xx += 1
-                                    val = stats[_file][stat][mutr + '_u'][2]
-                                    perc = val * 100.0 / sval2
-                                    lines[xx] += '{}({})\t'.format(val, round(perc, rnd))
-                                    xx += 1
-                            for MQR in ['MQ', 'MR']:
-                                if 'MQ' in stat and MQR == 'MQ':
-                                    gos = ['qgaps', 'qolaps']
-                                elif 'MR' in stat and MQR == 'MR':
-                                    gos = ['rgaps', 'rolaps']
-                                else:
-                                    continue
-                                for go in gos:
-                                    val2 = stats[_file][stat][go + 'c']
-                                    lines[xx] += '{}|{}\t'.format(len(val2), sum(val2))
-                                    xx += 1
-                                    for sstat in ['intronic', '3intron', 'intron5', '35prime']:
-                                        val = stats[_file][stat][go][sstat]
-                                        val = np.array(val)
-                                        perc = len(val) * 100.0 / len(val2)
-                                        pert = val.sum() * 100.0 / sum(val2)
-                                        lines[xx] += '{}({})|{}({})|{}|{}\t'.format(len(val), round(perc, rnd),
-                                                                                    val.sum(), round(pert, rnd),
-                                                                                    round(val.mean(), rnd),
-                                                                                    round(val.std(), rnd))
-                                        xx += 1
-                            # if 'MR' in stat:
-                            #     for go in ['rgaps', 'rolaps']:
-                            #         val2 = stats[_file][stat][go + 'c']
-                            #         lines[xx] += '{}\t'.format(val2)
-                            #         xx += 1
-                            #         for sstat in ['intronic', '3intron', 'intron5', '35prime']:
-                            #             val = stats[_file][stat][go][sstat]
-                            #             val = np.array(val)
-                            #             per = len(val) * 100.0 / val2
-                            #             lines[xx] += '{}({})|{}|{}|{}\t'.format(len(val), round(per, rnd), val.sum(),
-                            #                                                 round(val.mean(), rnd), round(val.std(), rnd))
-                            #             xx += 1
+                        vl = stats[_file][stat][mutr + '_u'][k]
+                        perc = vl * 100.0 / sval2
+                        pert = sum(val) * 100.0 / sum(val2)
+                        lines[xx] += '{}({})|{}({})|{}|{}\t'.format(vl, round(perc, rnd),
+                                                                    val.sum(), round(pert, rnd),
+                                                                    round(val.mean(), rnd),
+                                                                    round(val.std(), rnd))
+                        xx += 1
+                    val = stats[_file][stat][mutr + '_u'][2]
+                    perc = val * 100.0 / sval2
+                    lines[xx] += '{}({})\t'.format(val, round(perc, rnd))
+                    xx += 1
+            for MQR in ['MQ', 'MR']:
+                if 'MQ' in stat and MQR == 'MQ':
+                    gos = ['qgaps', 'qolaps']
+                elif 'MR' in stat and MQR == 'MR':
+                    gos = ['rgaps', 'rolaps']
+                else:
+                    continue
+                for go in gos:
+                    val2 = stats[_file][stat][go + 'c']
+                    lines[xx] += '{}|{}\t'.format(len(val2), sum(val2))
+                    xx += 1
+                    for sstat in ['intronic', '3intron', 'intron5', '35prime']:
+                        val = stats[_file][stat][go][sstat]
+                        val = np.array(val)
+                        if len(val2) != 0:
+                            perc = len(val) * 100.0 / len(val2)
+                            pert = val.sum() * 100.0 / sum(val2)
+                        else:
+                            perc = 0
+                            pert = 0
+                        lines[xx] += '{}({})|{}({})|{}|{}\t'.format(len(val), round(perc, rnd),
+                                                                    val.sum(), round(pert, rnd),
+                                                                    round(val.mean(), rnd),
+                                                                    round(val.std(), rnd))
+                        xx += 1
+            # if 'MR' in stat:
+            #     for go in ['rgaps', 'rolaps']:
+            #         val2 = stats[_file][stat][go + 'c']
+            #         lines[xx] += '{}\t'.format(val2)
+            #         xx += 1
+            #         for sstat in ['intronic', '3intron', 'intron5', '35prime']:
+            #             val = stats[_file][stat][go][sstat]
+            #             val = np.array(val)
+            #             per = len(val) * 100.0 / val2
+            #             lines[xx] += '{}({})|{}|{}|{}\t'.format(len(val), round(per, rnd), val.sum(),
+            #                                                 round(val.mean(), rnd), round(val.std(), rnd))
+            #             xx += 1
         lines[0] += '\t#\t'
         lines[1] += '\t#\t'
         lines[2] += '\t#\t'
         lines[3] += '\t#\t'
 
     for line in lines:
-        write.writerow(line + '\n')
+        write.write(line + '\n')
 
-        # write.writerow('\n')
-        # write.writerow('\n')
+        # write.write('\n')
+        # write.write('\n')
 # val = stats['QUERY_TEST_SAMPLE.gtf.db.itracking']['count_u']
 # print val
 # val = np.array(val)
