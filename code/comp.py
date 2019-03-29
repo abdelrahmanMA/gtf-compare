@@ -248,6 +248,8 @@ def parse_reference():
     intron_end = 0
     last_interval = None
     prev_transcript_id = None
+    prev_strand = None
+    reverse = None
 
     # Loops over all reference exons
     for i, exon in enumerate(tqdm(reference_exons)):
@@ -270,31 +272,50 @@ def parse_reference():
         # Checks if the current exon in a new transcript
         if prev_transcript_id != exon.transcript_id:
             if last_interval:
-                if number == 'First':
+                if number == 'First' or (number == 'Last' and prev_strand == '-'):
                     last_interval.transcriptIds[prev_transcript_id] = 'Single'
                 else:
-                    last_interval.transcriptIds[prev_transcript_id] = 'Last'
+                    if prev_strand == '-' and reverse:
+                        last_interval.transcriptIds[prev_transcript_id] = 'First'
+                    else:
+                        last_interval.transcriptIds[prev_transcript_id] = 'Last'
 
                 REF_STATS['Intronic_Edges'] -= 1
                 REF_STATS['3_Prime_UTR'] += 1
-            number = 'First'
+            if exon.strand == '-':
+                number = 'Last'
+                assumed = True
+                reverse = True
+            else:
+                number = 'First'
             prev_transcript_id = exon.transcript_id
-
-            if exon.strand == '+':
+            
+            if reverse:
                 intron_start = exon.end
                 intron_end = None
             else:
-                intron_start = None
-                intron_end = exon.start
+                if exon.strand == '+':
+                    intron_start = exon.end
+                    intron_end = None
+                else:
+                    intron_start = None
+                    intron_end = exon.start
         else:
-            if number == 'First':
-                number = 1
-            number += 1
-
             if exon.strand == '-':
-                intron_start = exon.end
-            else:
+                if assumed:
+                    if prev_strand == '-' and last_interval.end > exon.begin:
+                        last_interval.transcriptIds[exon.transcript_id] = 'First'
+                        reverse = False
+                    assumed = False
+            number = 'Mid'
+            
+            if reverse:
                 intron_end = exon.start
+            else:
+                if exon.strand == '-':
+                    intron_start = exon.end
+                else:
+                    intron_end = exon.start
 
         REF_STATS['Total_Exons'].append(exon.size)
         if number == 'Single':
@@ -402,11 +423,16 @@ def parse_reference():
         if exon.gene_id not in gene_strand_count[exon.chrom]:
             gene_strand_count[exon.chrom][exon.gene_id] = {'+': 0, '-': 0, '.': 0}
         gene_strand_count[exon.chrom][exon.gene_id][exon.strand] += 1
+        
+        prev_strand = exon.strand
 
-    if number == 'First':
+    if number == 'First' or (number == 'Last' and prev_strand == '-'):
         last_interval.transcriptIds[prev_transcript_id] = 'Single'
     else:
-        last_interval.transcriptIds[prev_transcript_id] = 'Last'
+        if prev_strand == '-' and reverse:
+            last_interval.transcriptIds[prev_transcript_id] = 'First'
+        else:
+            last_interval.transcriptIds[prev_transcript_id] = 'Last'
 
     REF_STATS['Intronic_Edges'] -= 1
     REF_STATS['3_Prime_UTR'] += 1
