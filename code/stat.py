@@ -516,7 +516,10 @@ with open('stats.txt', 'w') as write:
                 elif tt == 'count_t':
                     for mutr in ['5_prime_utr', '3_prime_utr', 'intronic_edge']:
                         val = stats[_file][stat][mutr][2]
-                        per = val * 100.0 / stats[_file][mutr][2]
+                        try:
+                            per = val * 100.0 / stats[_file][mutr][2]
+                        except:
+                            per = 0
                         lines[xx] += '{}({})\t'.format(val, round(per, rnd))
                         xx += 1
 
