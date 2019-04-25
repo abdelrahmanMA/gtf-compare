@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import gffutils
 from argparse import ArgumentParser
 from intervaltree import Interval, IntervalTree
