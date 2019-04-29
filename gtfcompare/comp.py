@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import gffutils
 from argparse import ArgumentParser
 from intervaltree import Interval, IntervalTree
@@ -272,14 +275,20 @@ def parse_reference():
             if last_interval:
                 if number == 'First' or (number == 'Last' and prev_strand == '-'):
                     last_interval.transcriptIds[prev_transcript_id] = 'Single'
+                    if number == 'First':
+                        REF_STATS['3_Prime_UTR'] += 1
+                    else:
+                        REF_STATS['5_Prime_UTR'] += 1
                 else:
                     if prev_strand == '-' and reverse:
                         last_interval.transcriptIds[prev_transcript_id] = 'First'
+                        REF_STATS['5_Prime_UTR'] += 1
                     else:
                         last_interval.transcriptIds[prev_transcript_id] = 'Last'
+                        REF_STATS['3_Prime_UTR'] += 1
 
                 REF_STATS['Intronic_Edges'] -= 1
-                REF_STATS['3_Prime_UTR'] += 1
+
             if exon.strand == '-':
                 number = 'Last'
                 assumed = True
@@ -287,7 +296,7 @@ def parse_reference():
             else:
                 number = 'First'
             prev_transcript_id = exon.transcript_id
-            
+
             if reverse:
                 intron_start = exon.end
                 intron_end = None
@@ -303,10 +312,12 @@ def parse_reference():
                 if assumed:
                     if prev_strand == '-' and last_interval.end > exon.begin:
                         last_interval.transcriptIds[exon.transcript_id] = 'First'
+                        REF_STATS['3_Prime_UTR'] -= 1
+                        REF_STATS['5_Prime_UTR'] += 1
                         reverse = False
                     assumed = False
             number = 'Mid'
-            
+
             if reverse:
                 intron_end = exon.start
             else:
@@ -421,19 +432,25 @@ def parse_reference():
         if exon.gene_id not in gene_strand_count[exon.chrom]:
             gene_strand_count[exon.chrom][exon.gene_id] = {'+': 0, '-': 0, '.': 0}
         gene_strand_count[exon.chrom][exon.gene_id][exon.strand] += 1
-        
+
         prev_strand = exon.strand
 
     if number == 'First' or (number == 'Last' and prev_strand == '-'):
         last_interval.transcriptIds[prev_transcript_id] = 'Single'
+        if number == 'First':
+            REF_STATS['3_Prime_UTR'] += 1
+        else:
+            REF_STATS['5_Prime_UTR'] += 1
     else:
         if prev_strand == '-' and reverse:
             last_interval.transcriptIds[prev_transcript_id] = 'First'
+            REF_STATS['5_Prime_UTR'] += 1
         else:
             last_interval.transcriptIds[prev_transcript_id] = 'Last'
+            REF_STATS['3_Prime_UTR'] += 1
 
     REF_STATS['Intronic_Edges'] -= 1
-    REF_STATS['3_Prime_UTR'] += 1
+
 
     for chromo in ref_chrom_dict:
         for strand in ref_chrom_dict[chromo]:

@@ -516,15 +516,24 @@ with open('stats.txt', 'w') as write:
                 elif tt == 'count_t':
                     for mutr in ['5_prime_utr', '3_prime_utr', 'intronic_edge']:
                         val = stats[_file][stat][mutr][2]
-                        per = val * 100.0 / stats[_file][mutr][2]
+                        try:
+                            per = val * 100.0 / stats[_file][mutr][2]
+                        except:
+                            per = 0
                         lines[xx] += '{}({})\t'.format(val, round(per, rnd))
                         xx += 1
 
             if stat != 'SQNR':
                 for mutr in ['5_prime_utr', '3_prime_utr', 'intronic_edge']:
                     val2 = stats[_file][stat][mutr][3]
-                    perc = len(val2) * 100.0 / len(stats[_file][mutr][3])
-                    pert = sum(val2) * 100.0 / sum(stats[_file][mutr][3])
+                    try:
+                        perc = len(val2) * 100.0 / len(stats[_file][mutr][3])
+                    except:
+                        perc = 0
+                    try:
+                        pert = sum(val2) * 100.0 / sum(stats[_file][mutr][3])
+                    except:
+                        pert = 0
                     sval2 = stats[_file][stat][mutr + '_u']
                     lines[xx] += '{}({})|{}({})\t'.format(sval2, round(perc, rnd),
                                                             sum(val2), round(pert, rnd))
@@ -534,15 +543,24 @@ with open('stats.txt', 'w') as write:
                         val = stats[_file][stat][mutr][k]
                         val = np.array(val)
                         vl = stats[_file][stat][mutr + '_u'][k]
-                        perc = vl * 100.0 / sval2
-                        pert = sum(val) * 100.0 / sum(val2)
+                        try:
+                            perc = vl * 100.0 / sval2
+                        except:
+                            perc = 0
+                        try:
+                            pert = sum(val) * 100.0 / sum(val2)
+                        except:
+                            pert = 0
                         lines[xx] += '{}({})|{}({})|{}|{}\t'.format(vl, round(perc, rnd),
                                                                     val.sum(), round(pert, rnd),
                                                                     round(val.mean(), rnd),
                                                                     round(val.std(), rnd))
                         xx += 1
                     val = stats[_file][stat][mutr + '_u'][2]
-                    perc = val * 100.0 / sval2
+                    try:
+                        perc = val * 100.0 / sval2
+                    except:
+                        perc = 0
                     lines[xx] += '{}({})\t'.format(val, round(perc, rnd))
                     xx += 1
             for MQR in ['MQ', 'MR']:
@@ -560,8 +578,14 @@ with open('stats.txt', 'w') as write:
                         val = stats[_file][stat][go][sstat]
                         val = np.array(val)
                         if len(val2) != 0:
-                            perc = len(val) * 100.0 / len(val2)
-                            pert = val.sum() * 100.0 / sum(val2)
+                            try:
+                                perc = len(val) * 100.0 / len(val2)
+                            except:
+                                perc = 0
+                            try:
+                                pert = val.sum() * 100.0 / sum(val2)
+                            except:
+                                pert = 0
                         else:
                             perc = 0
                             pert = 0
