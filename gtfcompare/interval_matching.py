@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import itertools
 import six
 
@@ -67,7 +68,7 @@ def is_overlapped(feature_1, feature_2):
 
     return [size_2, judgement]
 
-def match_interval(quer_chrom_dict, ref_chrom_dict):
+def match_intervals(quer_chrom_dict, ref_chrom_dict):
     """Matches query interval to the reference"""
 
     matching_dicts = MatchingDicts()
