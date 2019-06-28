@@ -30,7 +30,8 @@ def argument_parser():
     if args.i is not None:
         with open(args.i, 'r') as input_list:
             for line in input_list:
-                input_annotations.append(line.rstrip())
+                if line[0:1] != '#':
+                    input_annotations.append(line.rstrip())
 
     input_files = input_annotations
     reference = str(args.refgtf)
