@@ -8,6 +8,7 @@ class Feature():
     '''
     def __init__ (self, chromosome, source, f_type, start, end, score, strand, phase, attributes):
         self.chromosome = chromosome
+        self.chrom = self.chromosome
         self.source = source
         self.f_type = f_type
         self.start = start
@@ -63,7 +64,7 @@ class GTF():
         gff3 = False
         gff3_map = {}
         while line:
-            if line[0:2] != '##':
+            if line[0:1] != '#':
                 # Read each line into 9 columns
                 columns = line.split('\t')
                 chromosome = columns[0]
