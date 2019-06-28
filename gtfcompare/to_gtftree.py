@@ -28,6 +28,7 @@ def to_gtftree(Gtf_file, shortname):
     intron_end = 0
     last_interval = None
     prev_transcript_id = None
+    prev_strand = None
     reverse = None
 
     # Loops over all reference exons
@@ -52,10 +53,14 @@ def to_gtftree(Gtf_file, shortname):
             if last_interval:
                 if number == 'First':
                     last_interval.transcriptIds[prev_transcript_id] = 'Single'
+                    GTF_STATS['3_Prime_UTR'] += 1
+                elif prev_strand == '-' and reverse:
+                    last_interval.transcriptIds[prev_transcript_id] = 'First'
+                    GTF_STATS['5_Prime_UTR'] += 1
                 else:
                     last_interval.transcriptIds[prev_transcript_id] = 'Last'
+                    GTF_STATS['3_Prime_UTR'] += 1
 
-                GTF_STATS['3_Prime_UTR'] += 1
                 GTF_STATS['Intronic_Edges'] -= 1
 
             if exon.attributes['exon_number'] == 1:
@@ -67,6 +72,7 @@ def to_gtftree(Gtf_file, shortname):
                 reverse = True
 
             prev_transcript_id = exon.transcript_id
+            prev_strand = exon.strand
 
             if (exon.strand == '-' and not reverse):
                 intron_start = None
@@ -191,10 +197,14 @@ def to_gtftree(Gtf_file, shortname):
 
     if number == 'First':
         last_interval.transcriptIds[prev_transcript_id] = 'Single'
+        GTF_STATS['3_Prime_UTR'] += 1
+    elif exon.strand == '-' and reverse:
+        last_interval.transcriptIds[prev_transcript_id] = 'First'
+        GTF_STATS['5_Prime_UTR'] += 1
     else:
         last_interval.transcriptIds[prev_transcript_id] = 'Last'
+        GTF_STATS['3_Prime_UTR'] += 1
 
-    GTF_STATS['3_Prime_UTR'] += 1
     GTF_STATS['Intronic_Edges'] -= 1
 
     for chromo in gtf_chrom_dict:
@@ -223,24 +233,27 @@ def to_gtftree(Gtf_file, shortname):
             gtf_chrom_dict[chromo][strand][3][gene] = gtf_gene_dict[gene]
 
     # Write temporarily Reference stats file
-    with open(shortname + '.stat', 'w') as gtfstatf:
+    with open(shortname + '.tstat', 'w') as gtfstatf:
         wf = False
         for st in ['+', '-', '.']:
             for b, e, d in gtf_ulen[st]:
                 GTF_STATS['Unique_Exons'].append(e - b)
-        for key, value in GTF_STATS.items():
-            if 'Exons' in key:
-                val = np.array(value)
-                gtfstatf.write('{}(count|total|mean|std)\t{}|{}|{}|{}\n'.
-                            format(key, len(val), val.sum(), round(val.mean(), 1), round(val.std(), 1)))
-            else:
-                if key == '5_Prime_UTR':
-                    if value == GTF_STATS['3_Prime_UTR']:
-                        continue
-                    else:
-                        print('Something went wrong with stats UTRS don\'t match')
-                        wf = True
-                if key == '3_Prime_UTR' and not wf:
-                    key = 'Transcripts'
-                gtfstatf.write('{}(count)\t{}\n'.format(key, value))
+
+        for key in ['Total_Exons', 'Unique_Exons']:
+            value = GTF_STATS[key]
+            val = np.array(value)
+            gtfstatf.write('{}(count|total|mean|std)\t{}|{}|{}|{}\n'.
+                        format(key, len(val), val.sum(), round(val.mean(), 1), round(val.std(), 1)))
+
+        for key in ['5_Prime_UTR', '3_Prime_UTR', 'Intronic_Edges']:
+            value = GTF_STATS[key]
+            if key == '5_Prime_UTR':
+                if value == GTF_STATS['3_Prime_UTR']:
+                    continue
+                else:
+                    print('Something went wrong with stats UTRS don\'t match')
+                    wf = True
+            if key == '3_Prime_UTR' and not wf:
+                key = 'Transcripts'
+            gtfstatf.write('{}(count)\t{}\n'.format(key, value))
     return [gtf_chrom_dict, gtf_introns]
