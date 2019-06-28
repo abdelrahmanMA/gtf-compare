@@ -78,7 +78,7 @@ class GtfInterval:
         Raises
         ------
         RuntimeError
-            Duplicate feature
+            Duplicate Transcript
 
         Returns
         -------
@@ -92,12 +92,10 @@ class GtfInterval:
         if transcript_id not in self.transcriptIds:
             self.transcriptIds[transcript_id] = number
         else:
-            raise RuntimeError('Duplicate feature, Transcript')
+            raise RuntimeError('Duplicate Transcript')
 
         if gene_id not in self.geneIds:
             self.geneIds.add(gene_id)
-        else:
-            raise RuntimeError('Duplicate feature, Gene')
 
 
 class GtfExon:

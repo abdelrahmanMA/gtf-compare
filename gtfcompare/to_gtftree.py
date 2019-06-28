@@ -6,17 +6,16 @@ import numpy as np
 from gtftree import GtfInterval, GtfExon, GtfTranscript, GtfGene
 from GTF import GTF
 
-def parse_GTF(Gtf_file, is_ref=False):
+def to_gtftree(Gtf_file, shortname):
     """Generates GTF stats and constructs GTF dictionaries"""
     GTF_exons = GTF(Gtf_file)
     gtf_chrom_dict = {}
 
-    if is_ref:
-        gtf_introns = IntervalTree()  # Interval Tree to hold reference introns
-        # Next line defines a variable which will be used to calculate exonic unique length
-        gtf_ulen = {'+': IntervalTree(), '-': IntervalTree(), '.': IntervalTree()}
-        # Next line defines a variable which will be used to calculate reference statistics
-        GTF_STATS = {'Total_Exons': [], 'Unique_Exons': [], '5_Prime_UTR': 0, '3_Prime_UTR': 0, 'Intronic_Edges': 0}
+    gtf_introns = IntervalTree()  # Interval Tree to hold reference introns
+    # Next line defines a variable which will be used to calculate exonic unique length
+    gtf_ulen = {'+': IntervalTree(), '-': IntervalTree(), '.': IntervalTree()}
+    # Next line defines a variable which will be used to calculate reference statistics
+    GTF_STATS = {'Total_Exons': [], 'Unique_Exons': [], '5_Prime_UTR': 0, '3_Prime_UTR': 0, 'Intronic_Edges': 0}
 
     gene_strand_count = {}
     tran_strand_count = {}
@@ -35,19 +34,18 @@ def parse_GTF(Gtf_file, is_ref=False):
     for i, exon in enumerate(GTF_exons.parse()):
         exon_interval = Interval(exon.begin, exon.end + 1)
 
-        if is_ref:
-            # Calculates Unique length
-            mn = exon.begin
-            mx = exon.end + 1
-            # Loops over all overlapping intervals removes them
-            for b, e, d in gtf_ulen[exon.strand][mn - 1:mx]:
-                if b < mn:
-                    mn = b
-                if e > mx:
-                    mx = e
-                gtf_ulen[exon.strand].removei(b, e, d)
-            # Adds and interval to unique length starting from smallest start to the largest end
-            gtf_ulen[exon.strand].addi(mn, mx, i)
+        # Calculates Unique length
+        mn = exon.begin
+        mx = exon.end + 1
+        # Loops over all overlapping intervals removes them
+        for b, e, d in gtf_ulen[exon.strand][mn - 1:mx]:
+            if b < mn:
+                mn = b
+            if e > mx:
+                mx = e
+            gtf_ulen[exon.strand].removei(b, e, d)
+        # Adds and interval to unique length starting from smallest start to the largest end
+        gtf_ulen[exon.strand].addi(mn, mx, i)
 
         # Checks if the current exon in a new transcript
         if prev_transcript_id != exon.transcript_id:
@@ -70,30 +68,28 @@ def parse_GTF(Gtf_file, is_ref=False):
 
             prev_transcript_id = exon.transcript_id
 
-            if is_ref:
-                if (exon.strand == '-' and not reverse):
-                    intron_start = None
-                    intron_end = exon.start
-                else:
-                    intron_start = exon.end
-                    intron_end = None
-        else:
-            number = exon.attributes['exon_number']
-
-            if is_ref:
-                if (exon.strand == '-' and not reverse):
-                    intron_start = exon.end
-                else:
-                    intron_end = exon.start
-        if is_ref:
-            GTF_STATS['Total_Exons'].append(exon.size)
-            if intron_start and intron_end:
-                gtf_introns[intron_start:intron_end] = exon.strand
-
             if (exon.strand == '-' and not reverse):
+                intron_start = None
                 intron_end = exon.start
             else:
                 intron_start = exon.end
+                intron_end = None
+        else:
+            number = exon.attributes['exon_number']
+
+            if (exon.strand == '-' and not reverse):
+                intron_start = exon.end
+            else:
+                intron_end = exon.start
+
+        GTF_STATS['Total_Exons'].append(exon.size)
+        if intron_start and intron_end:
+            gtf_introns[intron_start:intron_end] = exon.strand
+
+        if (exon.strand == '-' and not reverse):
+            intron_end = exon.start
+        else:
+            intron_start = exon.end
 
         if number == 'Single':
             exit(1)
@@ -226,26 +222,25 @@ def parse_GTF(Gtf_file, is_ref=False):
                 strand = '.'
             gtf_chrom_dict[chromo][strand][3][gene] = gtf_gene_dict[gene]
 
-    if is_ref:
-        # Write temporarily Reference stats file
-        with open('refstat.txt', 'w') as refstatf:
-            wf = False
-            for st in ['+', '-', '.']:
-                for b, e, d in gtf_ulen[st]:
-                    GTF_STATS['Unique_Exons'].append(e - b)
-            for key, value in GTF_STATS.items():
-                if 'Exons' in key:
-                    val = np.array(value)
-                    refstatf.write('{}(count|total|mean|std)\t{}|{}|{}|{}\n'.
-                                format(key, len(val), val.sum(), round(val.mean(), 1), round(val.std(), 1)))
-                else:
-                    if key == '5_Prime_UTR':
-                        if value == GTF_STATS['3_Prime_UTR']:
-                            continue
-                        else:
-                            print('Something went wrong with stats UTRS don\'t match')
-                            wf = True
-                    if key == '3_Prime_UTR' and not wf:
-                        key = 'Transcripts'
-                    refstatf.write('{}(count)\t{}\n'.format(key, value))
-    return gtf_chrom_dict
+    # Write temporarily Reference stats file
+    with open(shortname + '.stat', 'w') as gtfstatf:
+        wf = False
+        for st in ['+', '-', '.']:
+            for b, e, d in gtf_ulen[st]:
+                GTF_STATS['Unique_Exons'].append(e - b)
+        for key, value in GTF_STATS.items():
+            if 'Exons' in key:
+                val = np.array(value)
+                gtfstatf.write('{}(count|total|mean|std)\t{}|{}|{}|{}\n'.
+                            format(key, len(val), val.sum(), round(val.mean(), 1), round(val.std(), 1)))
+            else:
+                if key == '5_Prime_UTR':
+                    if value == GTF_STATS['3_Prime_UTR']:
+                        continue
+                    else:
+                        print('Something went wrong with stats UTRS don\'t match')
+                        wf = True
+                if key == '3_Prime_UTR' and not wf:
+                    key = 'Transcripts'
+                gtfstatf.write('{}(count)\t{}\n'.format(key, value))
+    return [gtf_chrom_dict, gtf_introns]
