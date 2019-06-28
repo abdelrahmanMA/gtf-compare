@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import time
 from argument_parser import argument_parser
 from to_gtftree import to_gtftree
-import time
+from interval_matching import match_intervals
 
 reference, input_files = argument_parser()
 
@@ -16,3 +17,7 @@ for input_file in input_files:
     quer_chrom_dict, quer_introns = to_gtftree(input_file, input_file.split('/')[-1])
     time_end = time.time()
     print(input_file.split('/')[-1], time_end - time_begin)
+    time_begin = time.time()
+    match_intervals(quer_chrom_dict, ref_chrom_dict)
+    time_end = time.time()
+    print('match intervals', time_end - time_begin)
