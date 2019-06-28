@@ -1,8 +1,9 @@
+from intervaltree import Interval
 from interval_matching import MatchingDicts
 from notes import NOTES
 import six
 
-def write_exon(input_file, gtf_exons):
+def write_exons(input_file, gtf_chrom_dict):
     """Writes the .exon file"""
 
     dotexon = open(input_file + '.exon', 'w')
@@ -15,25 +16,27 @@ def write_exon(input_file, gtf_exons):
         dotexon.write("ExonID\tChromosome\tQuery(Coordinates[strand]|Transcript[exon_number])\tMatch_Type\t" +
                     "Reference(Best_Match_Coordinates|Transcript[exon_number])\tShared\tBase_Difference\tNotes\n")
 
-    for cnt, exon_id in enumerate(gtf_exons):
-        exon = gtf_exons[exon_id]
-        interval_begin, interval_end = exon.begin, exon.end
-        cinter = exon.gtf_interval
-        bests = interval_best_matches[interval_begin, interval_end]
-        # If a match (best match) was found write each match in .exon file
-        if bests:
-            for bintr, bval in bests.items():
-                dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\t{}\t{}-{}[{}]|{}\t{}\t({},{})\t({})\n'.format(
-                    cnt + 1, exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, exon.transcript_id,
-                    cinter.data.transcriptIds[exon.transcript_id], bval[1], bintr.begin, bintr.end - 1,
-                    bintr.data.strand, '|'.join(['{}[{}]'.format(k, v) for k, v in bintr.data.transcriptIds.items()]),
-                    bval[0], bintr.begin - cinter.begin, cinter.end - bintr.end, NOTES[cinter.data.note]
-                ))
-        else:
-            dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\tNovel\t-\t-\t-\t-\n'.format(
-                cnt + 1, exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, exon.transcript_id,
-                cinter.data.transcriptIds[exon.transcript_id]
-            ))
+    for chrom in gtf_chrom_dict:
+        for strand in gtf_chrom_dict[chrom]:
+            gtf_exons = gtf_chrom_dict[chrom][strand][1]
+            for exon_id in gtf_exons:
+                exon = gtf_exons[exon_id]
+                cinter = Interval(exon.begin, exon.end, exon.gtf_interval)
+                bests = interval_best_matches.get(cinter, None)
+                # If a match (best match) was found write each match in .exon file
+                if bests:
+                    for bintr, bval in bests.items():
+                        dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\t{}\t{}-{}[{}]|{}\t{}\t({},{})\t({})\n'.format(
+                            exon_id, exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, exon.transcript_id,
+                            cinter.data.transcriptIds[exon.transcript_id], bval[1], bintr.begin, bintr.end - 1,
+                            bintr.data.strand, '|'.join(['{}[{}]'.format(k, v) for k, v in bintr.data.transcriptIds.items()]),
+                            bval[0], bintr.begin - cinter.begin, cinter.end - bintr.end, NOTES[cinter.data.note]
+                        ))
+                else:
+                    dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\tNovel\t-\t-\t-\t-\n'.format(
+                        exon_id, exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, exon.transcript_id,
+                        cinter.data.transcriptIds[exon.transcript_id]
+                    ))
     dotexon.close()
 
 
