@@ -43,7 +43,7 @@ class GTF():
         re_len = len(exons)
         for i, ex in enumerate(exons):
             ex.attributes['exon_number'] = re_len - i
-            ex.attributes['exon_id'] = exon_id - i - 1
+            ex.attributes['exon_id'] = exon_id - re_len + i
             ex.set_id()
             yield ex
 
