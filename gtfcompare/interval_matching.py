@@ -45,8 +45,8 @@ def is_overlapped(feature_1, feature_2):
     start_2 = feature_2.begin
     end_2 = feature_2.end
 
-    size_1 = end_1 - start_1 + 1
-    size_2 = end_2 - start_2 + 1
+    size_1 = end_1 - start_1
+    size_2 = end_2 - start_2 
 
     if start_1 > start_2 or (start_1 == start_2 and size_2 > size_1):
         start_1, end_1, size_1, start_2, end_2, size_2 = start_2, end_2, size_2, start_1, end_1, size_1
@@ -64,7 +64,7 @@ def is_overlapped(feature_1, feature_2):
             judgement = "Contained"
 
     if end_2 > end_1:
-        return [end_1 - start_2 + 1, judgement]
+        return [end_1 - start_2, judgement]
 
     return [size_2, judgement]
 
@@ -78,11 +78,11 @@ def match_intervals(quer_chrom_dict, ref_chrom_dict):
     # Indicates if any match was found
     found = False
 
-    # No notes initially
-    note = 0
     for chrom in quer_chrom_dict:
         for stran in quer_chrom_dict[chrom]:
             for interval in quer_chrom_dict[chrom][stran][0]:
+                # No notes initially
+                note = 0
                 if chrom in ref_chrom_dict:
                     if stran in ref_chrom_dict[chrom]:
                         # Search Same strand first
@@ -151,7 +151,7 @@ def match_intervals(quer_chrom_dict, ref_chrom_dict):
                                 ii.append(i)
 
                         # Query interval size
-                        intr_size = interval.end - 1 - interval.begin
+                        intr_size = interval.end - interval.begin
                         if len(ii) > 1:
                             if note == 0:
                                 # Note 4: More than one best match was found all on the same strand same as query strand
