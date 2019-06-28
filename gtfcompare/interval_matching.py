@@ -46,7 +46,7 @@ def is_overlapped(feature_1, feature_2):
     end_2 = feature_2.end
 
     size_1 = end_1 - start_1
-    size_2 = end_2 - start_2 
+    size_2 = end_2 - start_2
 
     if start_1 > start_2 or (start_1 == start_2 and size_2 > size_1):
         start_1, end_1, size_1, start_2, end_2, size_2 = start_2, end_2, size_2, start_1, end_1, size_1
@@ -75,14 +75,13 @@ def match_intervals(quer_chrom_dict, ref_chrom_dict):
 
     interval_matches, interval_best_matches, ref_matches, ref_best_matches = matching_dicts.get_dicts()
 
-    # Indicates if any match was found
-    found = False
-
     for chrom in quer_chrom_dict:
         for stran in quer_chrom_dict[chrom]:
             for interval in quer_chrom_dict[chrom][stran][0]:
                 # No notes initially
                 note = 0
+                # Indicates if any match was found
+                found = False
                 if chrom in ref_chrom_dict:
                     if stran in ref_chrom_dict[chrom]:
                         # Search Same strand first
