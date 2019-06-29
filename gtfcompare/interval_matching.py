@@ -8,16 +8,23 @@ class MatchingDicts:
     ref_matches = {}
     ref_best_matches = {}
 
-    def __init__(self):
-        MatchingDicts.get_dicts()
-
     @staticmethod
     def get_dicts():
-        return [MatchingDicts.interval_matches, MatchingDicts.interval_best_matches, MatchingDicts.ref_matches, MatchingDicts.ref_best_matches]
+        return [MatchingDicts.interval_matches, MatchingDicts.interval_best_matches,\
+         MatchingDicts.ref_matches, MatchingDicts.ref_best_matches]
+
+    @staticmethod
+    def empty_dicts():
+        MatchingDicts.interval_matches = {}
+        MatchingDicts.interval_best_matches = {}
+        MatchingDicts.ref_matches = {}
+        MatchingDicts.ref_best_matches = {}
 
     @staticmethod
     def set_dicts(dicts):
-        MatchingDicts.interval_matches, MatchingDicts.interval_best_matches, MatchingDicts.ref_matches, MatchingDicts.ref_best_matches = dicts
+        MatchingDicts.empty_dicts()
+        MatchingDicts.interval_matches, MatchingDicts.interval_best_matches,\
+         MatchingDicts.ref_matches, MatchingDicts.ref_best_matches = dicts
 
     @staticmethod
     def get_interval_matches():
@@ -34,6 +41,7 @@ class MatchingDicts:
     @staticmethod
     def get_ref_best_matches():
         return MatchingDicts.ref_best_matches
+
 
 def is_overlapped(feature_1, feature_2):
     """Calculates the size of overlap and judgement of two features if exists"""
@@ -71,9 +79,10 @@ def is_overlapped(feature_1, feature_2):
 def match_intervals(quer_chrom_dict, ref_chrom_dict):
     """Matches query interval to the reference"""
 
-    matching_dicts = MatchingDicts()
-
-    interval_matches, interval_best_matches, ref_matches, ref_best_matches = matching_dicts.get_dicts()
+    interval_matches = {}
+    interval_best_matches = {}
+    ref_matches = {}
+    ref_best_matches = {}
 
     for chrom in quer_chrom_dict:
         for stran in quer_chrom_dict[chrom]:
@@ -200,5 +209,5 @@ def match_intervals(quer_chrom_dict, ref_chrom_dict):
                             if interval not in interval_matches:
                                 interval_matches[interval] = {}
                             interval_matches[interval][v] = (comp_overlaps[i], comp_judgements[i])
-    matching_dicts.set_dicts([interval_matches, interval_best_matches, ref_matches, ref_best_matches])
-    return matching_dicts.get_dicts()
+    MatchingDicts.set_dicts([interval_matches, interval_best_matches, ref_matches, ref_best_matches])
+    return MatchingDicts.get_dicts()
