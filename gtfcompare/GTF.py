@@ -39,11 +39,10 @@ class GTF():
     def __init__(self, GTF) :
         self.GTF = GTF
 
-    def order(self, exons, exon_id):
+    def order(self, exons):
         re_len = len(exons)
         for i, ex in enumerate(exons):
             ex.attributes['exon_number'] = re_len - i
-            ex.attributes['exon_id'] = exon_id - re_len + i
             ex.set_id()
             yield ex
 
@@ -94,8 +93,6 @@ class GTF():
                         if neg_ordered and re_order:
                             for i, re_ord in enumerate(re_order):
                                 re_ord.attributes['exon_number'] = i + 1
-                                exon_number = i + 1
-                                re_ord.attributes['exon_id'] = exon_id - len(re_order) + i
                                 re_ord.set_id()
                                 yield re_ord
                             re_order = []
@@ -111,8 +108,10 @@ class GTF():
                     else:
                         if prev_transcript == current_transcript or prev_transcript is None:
                             if prev_start is None:
+                                exon.attributes['exon_id'] = exon_id
                                 re_order.append(exon)
                             elif prev_start < end:
+                                exon.attributes['exon_id'] = exon_id
                                 re_order.append(exon)
                             else:
                                 exon.attributes['exon_number'] = 1
@@ -120,14 +119,15 @@ class GTF():
                                 re_order.append(exon)
                                 neg_ordered = True
                         else:
-                            for ex in self.order(re_order, exon_id):
+                            for ex in self.order(re_order):
                                 yield ex
+                            exon.attributes['exon_id'] = exon_id
                             re_order = [exon]
                     exon_id += 1
                     prev_transcript = current_transcript
                     prev_start = start
                 elif re_order:
-                    for ex in self.order(re_order, exon_id):
+                    for ex in self.order(re_order):
                         yield ex
                     re_order = []
             else:
@@ -139,6 +139,6 @@ class GTF():
             # use realine() to read next line
             line = GTF.readline()
         if re_order:
-            for ex in self.order(re_order, exon_id):
+            for ex in self.order(re_order):
                 yield ex
         GTF.close()
