@@ -7,7 +7,7 @@ def write_exons(input_file, gtf_chrom_dict):
     """Writes the .exon file"""
 
     dotexon = open(input_file + '.exon', 'w')
-    if input_file == 'ref':
+    if input_file[0:3] == 'ref':
         interval_best_matches = MatchingDicts.ref_best_matches
         dotexon.write("ExonID\tChromosome\tReference(Coordinates[strand]|Transcript[exon_number])\tMatch_Type\t" +
                 "Query(Best_Match_Coordinates|Transcript[exon_number])\tShared\tBase_Difference\tNotes\n")
@@ -15,28 +15,35 @@ def write_exons(input_file, gtf_chrom_dict):
         interval_best_matches = MatchingDicts.interval_best_matches
         dotexon.write("ExonID\tChromosome\tQuery(Coordinates[strand]|Transcript[exon_number])\tMatch_Type\t" +
                     "Reference(Best_Match_Coordinates|Transcript[exon_number])\tShared\tBase_Difference\tNotes\n")
-
+    gtf_exons = {}
     for chrom in gtf_chrom_dict:
         for strand in gtf_chrom_dict[chrom]:
-            gtf_exons = gtf_chrom_dict[chrom][strand][1]
-            for exon_id in gtf_exons:
-                exon = gtf_exons[exon_id]
-                cinter = Interval(exon.begin, exon.end, exon.gtf_interval)
-                bests = interval_best_matches.get(cinter, None)
-                # If a match (best match) was found write each match in .exon file
-                if bests:
-                    for bintr, bval in bests.items():
-                        dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\t{}\t{}-{}[{}]|{}\t{}\t({},{})\t({})\n'.format(
-                            exon_id, exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, exon.transcript_id,
-                            cinter.data.transcriptIds[exon.transcript_id], bval[1], bintr.begin, bintr.end - 1,
-                            bintr.data.strand, '|'.join(['{}[{}]'.format(k, v) for k, v in bintr.data.transcriptIds.items()]),
-                            bval[0], bintr.begin - cinter.begin, cinter.end - bintr.end, NOTES[cinter.data.note]
-                        ))
-                else:
-                    dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\tNovel\t-\t-\t-\t-\n'.format(
-                        exon_id, exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, exon.transcript_id,
-                        cinter.data.transcriptIds[exon.transcript_id]
-                    ))
+            len_after = len(gtf_exons) + len(gtf_chrom_dict[chrom][strand][1])
+            gtf_exonc = gtf_exons.copy()
+            gtf_exons.update(gtf_chrom_dict[chrom][strand][1])
+            if len(gtf_exons) < len_after:
+                print("Dictionary was OVERRITTEN");
+                ids = [(keyid, valid.id, valid.chrom, valid.strand, valid.begin, valid.end, "next", gtf_exonc[keyid].id, gtf_exonc[keyid].chrom, gtf_exonc[keyid].strand, gtf_exonc[keyid].begin, gtf_exonc[keyid].end) for keyid, valid in gtf_chrom_dict[chrom][strand][1].items() if keyid in gtf_exonc]
+                print(ids)
+                exit()
+    for exon_id in sorted(gtf_exons):
+        exon = gtf_exons[exon_id]
+        cinter = Interval(exon.begin, exon.end, exon.gtf_interval)
+        bests = interval_best_matches.get(cinter, None)
+        # If a match (best match) was found write each match in .exon file
+        if bests:
+            for bintr, bval in bests.items():
+                dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\t{}\t{}-{}[{}]|{}\t{}\t({},{})\t({})\n'.format(
+                    exon_id, exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, exon.transcript_id,
+                    cinter.data.transcriptIds[exon.transcript_id], bval[1], bintr.begin, bintr.end - 1,
+                    bintr.data.strand, '|'.join(['{}[{}]'.format(k, v) for k, v in bintr.data.transcriptIds.items()]),
+                    bval[0], bintr.begin - cinter.begin, cinter.end - bintr.end, NOTES[cinter.data.note]
+                ))
+        else:
+            dotexon.write('{}\t{}\t{}-{}[{}]|{}[{}]\tNovel\t-\t-\t-\t-\n'.format(
+                exon_id, exon.chrom, cinter.begin, cinter.end - 1, cinter.data.strand, exon.transcript_id,
+                cinter.data.transcriptIds[exon.transcript_id]
+            ))
     dotexon.close()
 
 
@@ -46,7 +53,7 @@ def write_itrack(input_file, gtf_chrom_dict, gtf_introns):
 
     # Create .itracking file
     itrack = open(input_file + '.itracking', 'w')
-    if input_file == 'ref':
+    if input_file[0:3] == 'ref':
         interval_best_matches = MatchingDicts.ref_best_matches
         interval_matches = MatchingDicts.ref_matches
         ref_matches = MatchingDicts.interval_matches
@@ -64,7 +71,7 @@ def write_itrack(input_file, gtf_chrom_dict, gtf_introns):
                     "\t[Reference_Structure]\tNotes\n")
     # Index for each row
     cnt = 0
-    # To hold reported intervals not to report them again
+    # To hold reported intervals, not to report them again
     reported = set()
     for chrom in gtf_chrom_dict:
         for strand in ['.', '+', '-']:
@@ -82,13 +89,14 @@ def write_itrack(input_file, gtf_chrom_dict, gtf_introns):
                     gtf_st = six.next(six.iterkeys(interval_best_matches[interval])).data.strand
 
                     if interval.data.strand != strand:
-                        print('SOMETHING IS WRONG STRANDS DOESN\'t MATCH Code: 1')
+                        print('SOMETHING IS WRONG STRANDS DON\'t MATCH Code: 1')
 
                     # Get current strand
                     quer_st = interval.data.strand
 
                     # Add note for the unknown strand if found on both reference strands
                     if len(interval_best_matches[interval]) > 1 and interval.data.note == 7:
+                        gtf_st = '+'
                         note = '(A best match on both strands was found only used {} (arbitrary decision))'.format(
                             gtf_st)
                     else:
@@ -212,7 +220,7 @@ def write_itrack(input_file, gtf_chrom_dict, gtf_introns):
                     itrack.write("{}\t({},{})\t{}\t{}\t{}\n".format(mtype, start, end, qstat, rstat, note))
                 else:
                     lvl = 'Intergenic'
-                    for b, e, s in gtf_introns[interval]:
+                    for b, e, s in gtf_introns[interval.begin:interval.end]:
                         if s == strand or strand == '.':
                             lvl = 'Intronic'
                     if interval.data.strand != strand:
