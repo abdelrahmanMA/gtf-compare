@@ -189,14 +189,18 @@ def match_intervals(quer_chrom_dict, ref_chrom_dict):
 
                         # To Calculate best match for the refrenece and to save all possible matches
                         for i, v in enumerate(comp):
+                            v.data.note = 0
                             if v in ref_best_matches:
                                 ri = ref_best_matches[v]
                                 rii = six.next(six.itervalues(ri))
+                                rik = six.next(six.iterkeys(ri))
                                 if (comp_overlaps[i] > rii[0]) or (comp_overlaps[i] == rii[0] and intr_size < rii[2]):
-                                    ri = {interval: (comp_overlaps[i], comp_judgements[i], intr_size)}
-                                    # ri[interval] = (comp_overlaps[i], comp_judgements[i])
-                                elif comp_overlaps[i] == rii[0] and comp_sizes[i] == rii[1]:
-                                    ri[interval] = (comp_overlaps[i], comp_judgements[i], intr_size)
+                                    ref_best_matches[v] = {interval: (comp_overlaps[i], comp_judgements[i], intr_size)}
+                                elif comp_overlaps[i] == rii[0] and comp_sizes[i] == rii[2]:
+                                    if v.data.strand in ['+', '-'] and rik.data.strand != '.' and interval.data.strand == '.':
+                                        ref_best_matches[v] = {interval: (comp_overlaps[i], comp_judgements[i], intr_size)}
+                                    else:
+                                        ri[interval] = (comp_overlaps[i], comp_judgements[i], intr_size)
                             else:
                                 ref_best_matches[v] = {}
                                 ri = ref_best_matches[v]
