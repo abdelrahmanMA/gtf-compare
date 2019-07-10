@@ -126,7 +126,7 @@ class GTF():
                     exon_id += 1
                     prev_transcript = current_transcript
                     prev_start = start
-                elif re_order:
+                elif needed_attributes.get('transcript_id', None) != prev_transcript:
                     for ex in self.order(re_order):
                         yield ex
                     re_order = []
