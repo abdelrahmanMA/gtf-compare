@@ -2,7 +2,7 @@ import os
 import numpy as np
 import time
 from intervaltree import IntervalTree, Interval
-import csv
+import openpyxl
 
 np.seterr(divide='ignore', invalid='ignore')
 
@@ -391,7 +391,7 @@ for _file in files:
                         stats[_file][change][x].append(abs(end))
                         stats[_file][_type][change][x].append(abs(end))
 
-        print(_file, time.time() - time1)
+        # print(_file, time.time() - time1)
 
 with open('stats.txt', 'w') as write:
     # write = csv.writer(write, delimiter='\t', quotechar=',')
